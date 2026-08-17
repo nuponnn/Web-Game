@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { getDatabase, ref, onValue } from "firebase/database";
-import { rldb } from "@/firebase"; // ปรับ path ตามโฟลเดอร์ของคุณ
+import {  ref, onValue } from "firebase/database";
+import { rldb } from "./firebase"; // ปรับ path ตามโฟลเดอร์ของคุณ
 
 // Firebase RTDB มี path พิเศษ .info/serverTimeOffset ที่ SDK คำนวณให้อัตโนมัติ
 // ค่านี้คือ (เวลา server - เวลาเครื่อง client) หน่วย ms

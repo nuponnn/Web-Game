@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
 import { get, ref, set, update } from "firebase/database";
-import { auth, rldb } from "@/firebase";
+import { auth, rldb } from "@/app/lib/firebase";
 import { useAuth } from "@/app/lib/useAuth";
 
 // หน้า Admin Login - แยกจาก flow ผู้เล่น (anonymous)

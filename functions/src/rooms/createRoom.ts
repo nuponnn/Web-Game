@@ -35,24 +35,34 @@ export const createRoom = onCall(async (request) => {
       request.data.spyCount :
       undefined;
 
+  // จำนวน joker (0-5) - host ทุกคนกำหนดได้
+  const MAX_JOKER_COUNT = 5;
+  const requestedJokerCount =
+    typeof request.data?.jokerCount === "number" && Number.isInteger(request.data.jokerCount) ?
+      Math.max(0, Math.min(MAX_JOKER_COUNT, request.data.jokerCount)) :
+      undefined;
+
   // เวลาหา spy (ms) - host ทุกคนกำหนดได้ จำกัด 1-15 นาที
   const MIN_ROUND_MS = 60 * 1000;
   const MAX_ROUND_MS = 15 * 60 * 1000;
   const requestedRoundDuration =
-    typeof request.data?.roundDuration === "number" && Number.isFinite(request.data.roundDuration)
-      ? Math.max(MIN_ROUND_MS, Math.min(MAX_ROUND_MS, request.data.roundDuration))
-      : undefined;
+    typeof request.data?.roundDuration === "number" &&
+    Number.isFinite(request.data.roundDuration) ?
+      Math.max(MIN_ROUND_MS, Math.min(MAX_ROUND_MS, request.data.roundDuration)) :
+      undefined;
 
   // เวลาโหวต (ms) - host ทุกคนกำหนดได้ จำกัด 10-120 วินาที
   const MIN_VOTE_MS = 10 * 1000;
   const MAX_VOTE_MS = 120 * 1000;
   const requestedVoteDuration =
-    typeof request.data?.voteDuration === "number" && Number.isFinite(request.data.voteDuration)
-      ? Math.max(MIN_VOTE_MS, Math.min(MAX_VOTE_MS, request.data.voteDuration))
-      : undefined;
+    typeof request.data?.voteDuration === "number" &&
+    Number.isFinite(request.data.voteDuration) ?
+      Math.max(MIN_VOTE_MS, Math.min(MAX_VOTE_MS, request.data.voteDuration)) :
+      undefined;
 
   let selectedLocationId: string | undefined;
   let spyCount: number | undefined;
+  let jokerCount: number | undefined;
 
   if (requestedLocationId || requestedSpyCount !== undefined) {
     await assertIsAdmin(uid);
@@ -81,6 +91,11 @@ export const createRoom = onCall(async (request) => {
     spyCount = requestedSpyCount;
   }
 
+  // จำนวน joker (0-5) - ไม่ต้องเช็ค admin เพราะ host ทุกคนกำหนดได้
+  if (requestedJokerCount !== undefined) {
+    jokerCount = requestedJokerCount;
+  }
+
   // สุ่ม roomId แล้วเช็คชนก่อน ลองใหม่ถ้าซ้ำ (โอกาสชนน้อยมากแต่กันไว้)
   let roomId = "";
   for (let attempt = 0; attempt < 5; attempt++) {
@@ -101,6 +116,7 @@ export const createRoom = onCall(async (request) => {
     createdAt: ServerValue.TIMESTAMP,
     ...(selectedLocationId ? { selectedLocationId } : {}),
     ...(spyCount !== undefined ? { spyCount } : {}),
+    ...(jokerCount !== undefined ? { jokerCount } : {}),
     ...(requestedRoundDuration !== undefined ? { roundDuration: requestedRoundDuration } : {}),
     ...(requestedVoteDuration !== undefined ? { voteDuration: requestedVoteDuration } : {}),
     players: {

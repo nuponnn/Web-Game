@@ -17,16 +17,19 @@ export default function VotingView({
   const [error, setError] = useState("");
 
   const playerList = Object.entries(room.players);
-  const hasVoted = uid ? Boolean(room.votes?.[uid]) : false;
+  // แยกกรณี "ยังไม่ได้โหวต" กับ "โหวต skip (ไม่โหวตใคร)" — สองอย่างนี้ต่างกัน
+  const myVote = uid ? room.votes?.[uid] : undefined;
+  const hasVoted = myVote !== undefined;
+  const myVoteTarget = myVote?.targetUid ?? null;
+  const votedSkip = hasVoted && myVoteTarget === null;
   const votesSoFar = room.votes ? Object.keys(room.votes).length : 0;
   const totalPlayers = playerList.length;
 
-  async function handleVote(targetUid: string) {
+  async function handleVote(targetUid: string | null) {
     setVoting(true);
     setError("");
     try {
       await castVote(roomId, targetUid);
-      // ไม่ต้องทำอะไรต่อ - hasVoted จะเปลี่ยนเองผ่าน room.votes ที่ subscribe อยู่
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "โหวตไม่สำเร็จ");
     } finally {
@@ -34,7 +37,6 @@ export default function VotingView({
     }
   }
 
-  // เรียก resolveVote เมื่อหมดเวลาโหวต - ตัดสินผลจากโหวตที่มีอยู่
   async function handleVoteTimeout() {
     try {
       await resolveVote(roomId);
@@ -47,39 +49,44 @@ export default function VotingView({
     <div>
       <h2>ใครคือ Spy?</h2>
 
-      {/* แสดงเวลาถอยหลังโหวต ถ้ามี voteEndsAt */}
       {room.round?.voteEndsAt && (
         <Countdown endsAt={room.round.voteEndsAt} onExpire={handleVoteTimeout} />
       )}
 
       <p>โหวตแล้ว {votesSoFar} / {totalPlayers}</p>
 
-      {!hasVoted ? (
-        <ul>
-          {playerList
-            .filter(([playerUid]) => playerUid !== uid) // ห้ามโหวตตัวเอง
-            .map(([playerUid, player]) => (
-              <li key={playerUid}>
-                {player.name}{" "}
-                <button onClick={() => handleVote(playerUid)} disabled={voting}>
-                  โหวต
-                </button>
-              </li>
-            ))}
-        </ul>
-      ) : (
-        <div>
-          <p>คุณโหวตแล้ว รอคนอื่น...</p>
-          <ul>
-            {Object.entries(room.votes || {}).map(([voterUid, vote]) => (
-              <li key={voterUid}>
-                {room.players[voterUid]?.name || "ผู้เล่น"}
-               
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      <ul>
+        {playerList.map(([playerUid, player]) => (
+          <li key={playerUid}>
+            {player.name}
+            {playerUid === uid && " (คุณ)"}
+            {playerUid === room.hostUid && " (host)"}
+            {myVoteTarget === playerUid && " ✓"}
+            <button
+              onClick={() => handleVote(playerUid)}
+              disabled={voting}
+              style={{ marginLeft: 8 }}
+            >
+              {myVoteTarget === playerUid ? "เปลี่ยนโหวต" : "โหวต"}
+            </button>
+          </li>
+        ))}
+      </ul>
+
+      <div style={{ marginTop: 12 }}>
+        <button
+          onClick={() => handleVote(null)}
+          disabled={voting}
+          style={{
+            padding: "6px 16px",
+            border: "1px solid #999",
+            borderRadius: 4,
+            background: votedSkip ? "#e0e0e0" : undefined,
+          }}
+        >
+          {votedSkip ? "ไม่โหวต (✓)" : "ไม่โหวต"}
+        </button>
+      </div>
 
       {error && <p style={{ color: "red" }}>{error}</p>}
     </div>

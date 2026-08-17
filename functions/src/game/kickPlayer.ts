@@ -33,11 +33,13 @@ export const kickPlayer = onCall(async (request) => {
   }
 
   // ลบผู้เล่นออกจาก players + ลบ presence ด้วย (กันค้าง)
+  // + ลบ roomPrivate ของคนนั้น (ข้อมูลลับของเขาไม่ควรค้างอยู่)
   // สำคัญ: db.ref().update() เขียนจาก root ต้องใส่ path เต็ม
   const db = admin.database();
   const updates: Record<string, unknown> = {};
   updates[`rooms/${roomId}/players/${targetUid}`] = null;
   updates[`presence/${roomId}/${targetUid}`] = null;
+  updates[`roomPrivate/${roomId}/${targetUid}`] = null;
 
   await db.ref().update(updates);
 

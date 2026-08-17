@@ -20,22 +20,20 @@
       "$roomId": {
         ".read": "auth != null",
 
-        ".write": false,
+        ".write": false
 
-        "location": {
-  
-          ".read": "auth != null && root.child('rooms/' + $roomId + '/players/' + auth.uid + '/isSpy').val() === false"
-        },
+        // หมายเหตุสำคัญ: ห้ามใส่ child rule กันข้อมูลลับใต้โหนดนี้ (เช่น location/role/isSpy)
+        // เพราะ security rules cascade — rule ที่ parent อนุญาตแล้ว child กันไม่ได้
+        // (child rule ห้าม "revoke" สิทธิ์ที่ parent ให้ไว้) ข้อมูลลับต้องย้ายออกไป
+        // อยู่ที่ roomPrivate/{roomId}/{uid} ซึ่งเปิดอ่านได้เฉพาะเจ้าของ uid
+      }
+    },
 
-        "players": {
-          "$uid": {
-            "role": {
-              ".read": "auth.uid === $uid"
-            },
-            "isSpy": {
-              ".read": "auth.uid === $uid"
-            }
-          }
+    "roomPrivate": {
+      "$roomId": {
+        "$uid": {
+          ".read": "auth != null && $uid === auth.uid",
+          ".write": false
         }
       }
     },

@@ -1,15 +1,16 @@
 import { httpsCallable } from "firebase/functions";
-import { functions } from "@/firebase";
+import { functions } from "./firebase";
 
 export async function createRoom(
   name: string,
-  options?: { locationId?: string; spyCount?: number; roundDuration?: number; voteDuration?: number }
+  options?: { locationId?: string; spyCount?: number; jokerCount?: number; roundDuration?: number; voteDuration?: number }
 ) {
   const fn = httpsCallable(functions, "createRoom");
   const res = await fn({
     name,
     ...(options?.locationId ? { locationId: options.locationId } : {}),
     ...(options?.spyCount ? { spyCount: options.spyCount } : {}),
+    ...(options?.jokerCount !== undefined ? { jokerCount: options.jokerCount } : {}),
     ...(options?.roundDuration ? { roundDuration: options.roundDuration } : {}),
     ...(options?.voteDuration ? { voteDuration: options.voteDuration } : {}),
   });
@@ -24,17 +25,18 @@ export async function joinRoom(roomId: string, name: string) {
 
 export async function startGame(
   roomId: string,
-  options?: { locationId?: string; spyCount?: number; roundDuration?: number; voteDuration?: number }
+  options?: { locationId?: string; spyCount?: number; jokerCount?: number; roundDuration?: number; voteDuration?: number }
 ) {
   const fn = httpsCallable(functions, "startGame");
   const res = await fn({
     roomId,
     ...(options?.locationId ? { locationId: options.locationId } : {}),
     ...(options?.spyCount ? { spyCount: options.spyCount } : {}),
+    ...(options?.jokerCount !== undefined ? { jokerCount: options.jokerCount } : {}),
     ...(options?.roundDuration ? { roundDuration: options.roundDuration } : {}),
     ...(options?.voteDuration ? { voteDuration: options.voteDuration } : {}),
   });
-  return res.data as { ok: true; endsAt: number; spyCount: number; roundDuration: number; voteDuration: number };
+  return res.data as { ok: true; endsAt: number; spyCount: number; jokerCount: number; roundDuration: number; voteDuration: number };
 }
 
 export async function endRound(roomId: string, reason: "timeout" | "host_ended") {
@@ -43,9 +45,9 @@ export async function endRound(roomId: string, reason: "timeout" | "host_ended")
   return res.data as { ok: true; voteEndsAt: number };
 }
 
-export async function castVote(roomId: string, targetUid: string) {
+export async function castVote(roomId: string, targetUid?: string | null) {
   const fn = httpsCallable(functions, "castVote");
-  const res = await fn({ roomId, targetUid });
+  const res = await fn({ roomId, targetUid: targetUid ?? null });
   return res.data as { ok: true; votesSoFar: number; totalPlayers: number };
 }
 

@@ -7,6 +7,7 @@ export interface Player {
   name: string;
   online: boolean;
   isSpy?: boolean;
+  isJoker?: boolean;
   role?: string;
   joinedAt: number;
 }
@@ -18,6 +19,7 @@ export interface Room {
   locationId?: string;
   selectedLocationId?: string; // admin ตั้งไว้ตอนสร้างห้อง (ก่อน start ยังแก้ได้ใน Lobby)
   spyCount?: number; // จำนวน spy ที่ host กำหนด (default 1)
+  jokerCount?: number; // จำนวน joker ที่ host กำหนด (default 0, ช่วง 0-5)
   roundDuration?: number; // เวลาหา spy (ms) ที่ host กำหนด (default 8 นาที)
   voteDuration?: number; // เวลาโหวต (ms) ที่ host กำหนด (default 30 วินาที)
   players: Record<string, Player>;
@@ -28,10 +30,12 @@ export interface Room {
     voteEndsAt?: number;
   };
   // voterUid -> { targetUid, votedAt } (มี timestamp กำกับเวลาโหวต)
-  votes?: Record<string, { targetUid: string; votedAt: number }>;
+  // targetUid = null หมายถึง skip vote (ไม่โหวตใคร)
+  votes?: Record<string, { targetUid: string | null; votedAt: number }>;
   result?: {
-    winner: "players" | "spy";
-    spyUids: string[]; // spy มีได้หลายคน (host/admin กำหนดได้)
+    winner: "players" | "spy" | "joker";
+    spyUids: string[]; // spy มีได้หลายคน (host/admin กำหนด spyCount ได้)
+    jokerUids: string[]; // joker มีได้หลายคน (host/admin กำหนด jokerCount ได้)
     votedOutUid: string | null;
   };
 }

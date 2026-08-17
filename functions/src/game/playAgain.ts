@@ -15,19 +15,23 @@ export const playAgain = onCall(async (request) => {
   const room = await getRoomOrThrow(roomId);
   assertIsHost(room, uid);
 
-  // ล้าง isSpy/role ของผู้เล่นทุกคน
-  const playerUpdates: Record<string, unknown> = {};
+  // ล้างของลับของรอบที่แล้วทั้งหมด: เคลียร์ players/{uid}/isSpy|isJoker|role
+  // (เผื่อมี residue จากรอบก่อน/ข้อมูลเดิม) + ลบ roomPrivate/{roomId} ทั้งก้อน
+  const updates: Record<string, unknown> = {};
   Object.keys(room.players || {}).forEach((playerUid) => {
-    playerUpdates[`players/${playerUid}/isSpy`] = null;
-    playerUpdates[`players/${playerUid}/role`] = null;
+    updates[`rooms/${roomId}/players/${playerUid}/isSpy`] = null;
+    updates[`rooms/${roomId}/players/${playerUid}/isJoker`] = null;
+    updates[`rooms/${roomId}/players/${playerUid}/role`] = null;
   });
 
-  await admin.database().ref(`rooms/${roomId}`).update({
-    status: "lobby",
-    ...playerUpdates,
-    round: null,
-    votes: null,
-    result: null,
+  const db = admin.database();
+  await db.ref().update({
+    ...updates,
+    [`rooms/${roomId}/status`]: "lobby",
+    [`rooms/${roomId}/round`]: null,
+    [`rooms/${roomId}/votes`]: null,
+    [`rooms/${roomId}/result`]: null,
+    [`roomPrivate/${roomId}`]: null,
   });
 
   return { ok: true };

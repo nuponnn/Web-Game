@@ -13,39 +13,33 @@ export const castVote = onCall(async (request) => {
   assertAuthed(uid);
 
   const roomId: string = request.data?.roomId;
-  const targetUid: string = request.data?.targetUid;
-  if (!roomId || !targetUid) {
-    throw new HttpsError("invalid-argument", "ต้องระบุ roomId และ targetUid");
+  const targetUid: string | null = request.data?.targetUid ?? null;
+  if (!roomId) {
+    throw new HttpsError("invalid-argument", "ต้องระบุ roomId");
   }
 
   const room = await getRoomOrThrow(roomId);
   assertStatus(room, "voting");
   assertIsPlayer(room, uid);
 
-  if (!room.players[targetUid]) {
+  // ถ้าโหวตคน (ไม่ใช่ skip) ต้องเป็นผู้เล่นในห้อง
+  if (targetUid !== null && !room.players[targetUid]) {
     throw new HttpsError("invalid-argument", "โหวตคนที่ไม่ได้อยู่ในห้องไม่ได้");
   }
 
   const db = admin.database();
 
-  // ห้ามโหวตซ้ำ: ใช้ transaction กันกรณี double-click / race condition
-  // เก็บเป็น object { targetUid, votedAt } เพื่อให้รู้ว่าโหวตตอนไหน
+  // อนุญาตให้เปลี่ยนโหวตได้: set เขียนทับค่าเดิม (ไม่ block โหวตซ้ำ)
   const votedAt = Date.now();
   const voteRef = db.ref(`rooms/${roomId}/votes/${uid}`);
-  const result = await voteRef.transaction((current) => {
-    if (current !== null) return; // มีค่าอยู่แล้ว = โหวตไปแล้ว ยกเลิก write
-    return { targetUid, votedAt };
-  });
+  await voteRef.set({ targetUid, votedAt });
 
-  if (!result.committed) {
-    throw new HttpsError("already-exists", "คุณโหวตไปแล้ว");
-  }
-
-  // เช็คว่าโหวตครบทุกคนหรือยัง ถ้าครบ resolve ทันที
+  // เช็คว่าโหวตครบทุกคนหรือยัง (นับทุกคนรวม skip)
   const freshRoomSnap = await db.ref(`rooms/${roomId}`).once("value");
   const freshRoom = freshRoomSnap.val() as Room;
   const totalPlayers = Object.keys(freshRoom.players).length;
-  const totalVotes = Object.keys(freshRoom.votes || {}).length;
+  const allVotes = freshRoom.votes || {};
+  const totalVotes = Object.keys(allVotes).length;
 
   if (totalVotes >= totalPlayers) {
     await resolveVote(roomId, freshRoom);
@@ -59,6 +53,8 @@ export async function resolveVote(roomId: string, room: Room) {
   const votes = room.votes || {};
   const tally: Record<string, number> = {};
   Object.values(votes).forEach((vote) => {
+    // ข้าม skip vote (targetUid เป็น null)
+    if (vote.targetUid == null) return;
     tally[vote.targetUid] = (tally[vote.targetUid] || 0) + 1;
   });
 
@@ -77,8 +73,17 @@ export async function resolveVote(roomId: string, room: Room) {
   });
   if (isTie) votedOutUid = null;
 
-  // ตรวจว่าโดนโหวตออกเป็น spy หรือไม่ (spy มีได้หลายคน)
-  const spyUids = Object.keys(room.players).filter((id) => room.players[id].isSpy);
+  // ตรวจ role ของผู้เล่นที่โดนโหวต — อ่านจาก roomPrivate/{roomId}/{uid}
+  // (isSpy/isJoker ไม่ได้อยู่ใน public room แล้ว อยู่ private ต่อผู้เล่น)
+  const db = admin.database();
+  const privateSnap = await db.ref(`roomPrivate/${roomId}`).once("value");
+  const privateVal = (privateSnap.val() as
+    | Record<string, { isSpy?: boolean; isJoker?: boolean; location?: string }>
+    | null) || {};
+
+  const spyUids = Object.keys(privateVal).filter((id) => privateVal[id]?.isSpy);
+  const jokerUids = Object.keys(privateVal).filter((id) => privateVal[id]?.isJoker);
+
   if (spyUids.length === 0) {
     throw new HttpsError(
       "internal",
@@ -86,11 +91,27 @@ export async function resolveVote(roomId: string, room: Room) {
     );
   }
 
-  const votedOutIsSpy = votedOutUid !== null && spyUids.includes(votedOutUid);
-  const winner: "players" | "spy" = votedOutIsSpy ? "players" : "spy";
+  // หาชื่อสถานที่จาก private ของคนที่ไม่ใช่ spy (จบเกมแล้ว -> เปิดให้ทุกคนเห็นได้)
+  // เผื่อ location ถูกลบไปจากลิสต์ระหว่างเล่น ยังมีชื่อเก็บไว้ใน private
+  const location =
+    Object.values(privateVal).find((p) => p?.location)?.location ?? null;
 
-  await admin.database().ref(`rooms/${roomId}`).update({
+  // ตัดสินผล:
+  // - joker โดนโหวตออก -> joker ชนะ
+  // - spy โดนโหวตออก -> ผู้เล่นชนะ
+  // - ไม่ใช่ทั้งคู่ หรือเสมอ -> spy ชนะ
+  let winner: "players" | "spy" | "joker";
+  if (votedOutUid !== null && jokerUids.includes(votedOutUid)) {
+    winner = "joker";
+  } else {
+    const votedOutIsSpy = votedOutUid !== null && spyUids.includes(votedOutUid);
+    winner = votedOutIsSpy ? "players" : "spy";
+  }
+
+  await db.ref(`rooms/${roomId}`).update({
     status: "reveal",
-    result: { winner, spyUids, votedOutUid },
+    // เขียน location ลง public room เฉพาะตอนจบเกม เพื่อให้ทุกคน (รวม spy) เห็น
+    location,
+    result: { winner, spyUids, jokerUids, votedOutUid },
   });
 }

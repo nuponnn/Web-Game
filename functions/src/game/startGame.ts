@@ -84,25 +84,49 @@ export const startGame = onCall(async (request) => {
     );
   }
 
+  // จำนวน joker: จากที่ host ส่งตอน start -> ค่าที่ตั้งไว้ตอนสร้างห้อง -> default 0
+  const MAX_JOKER_COUNT = 5;
+  const requestedJokerCount =
+    typeof request.data?.jokerCount === "number" && Number.isInteger(request.data.jokerCount) ?
+      Math.max(0, Math.min(MAX_JOKER_COUNT, request.data.jokerCount)) :
+      room.jokerCount ?? 0;
+
+  // ตรวจสอบว่า spy + joker < จำนวนผู้เล่น (ต้องเหลือคนปกติอย่างน้อย 1 คน)
+  if (requestedSpyCount + requestedJokerCount >= playerIds.length) {
+    const total = requestedSpyCount + requestedJokerCount;
+    throw new HttpsError(
+      "invalid-argument",
+      `spy + joker = ${total} ต้องน้อยกว่าผู้เล่น ${playerIds.length} คน`
+    );
+  }
+
   // ระยะเวลาหา spy (ms): จากที่ host ส่งตอน start -> ค่าที่ตั้งไว้ตอนสร้างห้อง -> default 8 นาที
   // จำกัดช่วง 1-15 นาที กันตั้งค่าผิดพลาด
-  const MIN_ROUND_MS = 60 * 1000;      // 1 นาที
+  const MIN_ROUND_MS = 60 * 1000; // 1 นาที
   const MAX_ROUND_MS = 15 * 60 * 1000; // 15 นาที
   const requestedRoundDuration =
-    typeof request.data?.roundDuration === "number" && Number.isFinite(request.data.roundDuration)
-      ? request.data.roundDuration
-      : room.roundDuration ?? DEFAULT_ROUND_DURATION_MS;
-  const roundDurationMs = Math.max(MIN_ROUND_MS, Math.min(MAX_ROUND_MS, requestedRoundDuration));
+    typeof request.data?.roundDuration === "number" &&
+    Number.isFinite(request.data.roundDuration) ?
+      request.data.roundDuration :
+      room.roundDuration ?? DEFAULT_ROUND_DURATION_MS;
+  const roundDurationMs = Math.max(
+    MIN_ROUND_MS,
+    Math.min(MAX_ROUND_MS, requestedRoundDuration)
+  );
 
   // ระยะเวลาโหวต (ms): จากที่ host ส่งตอน start -> ค่าที่ตั้งไว้ตอนสร้างห้อง -> default 30 วินาที
-  const MIN_VOTE_MS = 10 * 1000;   // 10 วินาที
-  const MAX_VOTE_MS = 120 * 1000;  // 2 นาที
+  const MIN_VOTE_MS = 10 * 1000; // 10 วินาที
+  const MAX_VOTE_MS = 120 * 1000; // 2 นาที
   const DEFAULT_VOTE_DURATION_MS = 30 * 1000;
   const requestedVoteDuration =
-    typeof request.data?.voteDuration === "number" && Number.isFinite(request.data.voteDuration)
-      ? request.data.voteDuration
-      : room.voteDuration ?? DEFAULT_VOTE_DURATION_MS;
-  const voteDurationMs = Math.max(MIN_VOTE_MS, Math.min(MAX_VOTE_MS, requestedVoteDuration));
+    typeof request.data?.voteDuration === "number" &&
+    Number.isFinite(request.data.voteDuration) ?
+      request.data.voteDuration :
+      room.voteDuration ?? DEFAULT_VOTE_DURATION_MS;
+  const voteDurationMs = Math.max(
+    MIN_VOTE_MS,
+    Math.min(MAX_VOTE_MS, requestedVoteDuration)
+  );
 
   // 2. สุ่ม spy ตามจำนวนที่กำหนด (ไม่ซ้ำกัน)
   const shuffled = [...playerIds].sort(() => Math.random() - 0.5);
@@ -110,37 +134,62 @@ export const startGame = onCall(async (request) => {
   const spySet = new Set(spyUids);
   const nonSpyIds = playerIds.filter((id) => !spySet.has(id));
 
-  // 3. แจก role ให้คนที่ไม่ใช่สปาย
-  const roles = assignRoles(location, nonSpyIds.length);
+  // 3. สุ่ม joker จากผู้เล่นที่ไม่ใช่ spy (ไม่ซ้ำกัน)
+  const shuffledNonSpy = [...nonSpyIds].sort(() => Math.random() - 0.5);
+  const jokerUids = shuffledNonSpy.slice(0, requestedJokerCount);
+  const jokerSet = new Set(jokerUids);
+  const nonSpyNonJokerIds = nonSpyIds.filter((id) => !jokerSet.has(id));
 
-  // 4. เตรียม multi-path update เขียนทีเดียวให้ atomic
+  // 4. แจก role ให้คนที่ไม่ใช่ spy และไม่ใช่ joker
+  const roles = assignRoles(location, nonSpyNonJokerIds.length);
+  const roleByUid: Record<string, string> = {};
+  nonSpyNonJokerIds.forEach((id, i) => {
+    roleByUid[id] = roles[i];
+  });
+
+  // 5. เตรียม multi-path update เขียนทีเดียวให้ atomic (เขียนจาก root ต้องใส่ path เต็ม)
+  //    ข้อมูลลับ (location/role/isSpy/isJoker) เขียนไปที่ roomPrivate/{roomId}/{uid}
+  //    เพราะ rule ของ rooms/{roomId} เปิดอ่านทุกคน และ rules cascade ทำให้ child rule
+  //    กันข้อมูลลับไม่ได้ (child ไม่อาจ revoke สิทธิ์ที่ parent ให้) ต้องแยก path ต่างหาก
   const updates: Record<string, unknown> = {};
+  const privateUpdates: Record<string, unknown> = {};
   playerIds.forEach((id) => {
     const isSpy = spySet.has(id);
-    updates[`players/${id}/isSpy`] = isSpy;
-    updates[`players/${id}/role`] = isSpy ? "spy" : null; // เดี๋ยวเติมด้านล่าง
-  });
-  nonSpyIds.forEach((id, i) => {
-    updates[`players/${id}/role`] = roles[i];
+    const isJoker = jokerSet.has(id);
+    const isNormal = !isSpy && !isJoker;
+    privateUpdates[`roomPrivate/${roomId}/${id}`] = {
+      isSpy,
+      isJoker,
+      // spy ไม่ได้รู้ location; ผู้เล่นปกติได้ location + role (joker ได้แค่ location)
+      ...(isNormal ? { role: roleByUid[id], location: location.name } : isJoker ? { location: location.name } : {}),
+    };
+    // เคลียร์ secret fields เก่าที่เคยเขียนไว้ใต้ players (ข้อมูลรอบก่อน/ข้อมูลเดิม) กันรั่ว
+    updates[`rooms/${roomId}/players/${id}/isSpy`] = null;
+    updates[`rooms/${roomId}/players/${id}/isJoker`] = null;
+    updates[`rooms/${roomId}/players/${id}/role`] = null;
   });
 
-  updates["location"] = location.name;
-  updates["locationId"] = location.id; // เก็บ id เผื่อ audit / กันแก้ location ที่กำลังใช้อยู่
-  updates["status"] = "playing";
-  updates["votes"] = null; // เคลียร์ของรอบก่อนหน้า (กันกรณีเล่นซ้ำ)
-  updates["result"] = null;
+  // location (ชื่อ) ไม่เขียนใน public room ระหว่างเล่น — จะถูกเขียนตอน reveal (ดู castVote.ts)
+  // เพื่อให้ spy เห็นสถานที่ตอนจบเกม แต่เห็นไม่ได้ระหว่างเล่น
+  updates[`rooms/${roomId}/location`] = null;
+  updates[`rooms/${roomId}/locationId`] = location.id; // เก็บ id เผื่อ audit / กันแก้ location ที่กำลังใช้อยู่
+  updates[`rooms/${roomId}/status`] = "playing";
+  updates[`rooms/${roomId}/votes`] = null; // เคลียร์ของรอบก่อนหน้า (กันกรณีเล่นซ้ำ)
+  updates[`rooms/${roomId}/result`] = null;
 
   // สำคัญ: ใช้ ServerValue.TIMESTAMP เพื่อให้ endsAt คำนวณจากเวลา server จริง
   // ต้องเขียน 2 ครั้ง เพราะ ServerValue.TIMESTAMP resolve ตอน commit เท่านั้น
   // เราจึงต้อง set startedAt ก่อน แล้วค่อยคำนวณ endsAt จากค่าที่ resolve แล้วในขั้นถัดไป
-  updates["round/duration"] = roundDurationMs;
-  updates["round/startedAt"] = ServerValue.TIMESTAMP;
+  updates[`rooms/${roomId}/round/duration`] = roundDurationMs;
+  updates[`rooms/${roomId}/round/startedAt`] = ServerValue.TIMESTAMP;
 
   // เก็บค่า roundDuration ที่ใช้จริงไว้ในห้อง เพื่อให้รอบถัดไป (playAgain) ใช้ค่าเดิมได้
-  updates["roundDuration"] = roundDurationMs;
-  updates["voteDuration"] = voteDurationMs;
+  updates[`rooms/${roomId}/roundDuration`] = roundDurationMs;
+  updates[`rooms/${roomId}/voteDuration`] = voteDurationMs;
+  updates[`rooms/${roomId}/jokerCount`] = requestedJokerCount;
 
-  await admin.database().ref(`rooms/${roomId}`).update(updates);
+  // เขียน public room + private data ใน update เดียว (root) ให้ atomic
+  await admin.database().ref().update({ ...updates, ...privateUpdates });
 
   // อ่านค่า startedAt ที่ server resolve แล้วกลับมา เพื่อคำนวณ endsAt ที่แม่นยำ
   const startedAtSnap = await admin
@@ -152,5 +201,12 @@ export const startGame = onCall(async (request) => {
 
   await admin.database().ref(`rooms/${roomId}/round/endsAt`).set(endsAt);
 
-  return { ok: true, endsAt, spyCount: spyUids.length, roundDuration: roundDurationMs, voteDuration: voteDurationMs };
+  return {
+    ok: true,
+    endsAt,
+    spyCount: spyUids.length,
+    jokerCount: requestedJokerCount,
+    roundDuration: roundDurationMs,
+    voteDuration: voteDurationMs,
+  };
 });

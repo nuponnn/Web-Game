@@ -1,5 +1,5 @@
 import { httpsCallable } from "firebase/functions";
-import { functions } from "@/firebase";
+import { functions } from "./firebase";
 
 // client wrapper สำหรับ function ฝั่ง admin
 // backend จะเช็คสิทธิ์ admin (admins/{uid}) เองเสมอ ไม่เชื่อ client

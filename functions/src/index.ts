@@ -17,7 +17,7 @@ export { createRoom } from "./rooms/createRoom";
 export { joinRoom } from "./rooms/joinRoom";
 export { presenceCleanup } from "./rooms/presenceCleanup";
 export { cleanupRooms } from "./rooms/cleanupRooms";
-export { cleanupAuthUsers } from "./auth/cleanupAuthUsers";
+export { cleanupAuthUsers, cleanupAuthUsersTest } from "./auth/cleanupAuthUsers";
 export { startGame } from "./game/startGame";
 export { endRound } from "./game/endRound";
 export { castVote } from "./game/castVote";

@@ -1,7 +1,7 @@
 "use client";
 import { createContext, useContext, useEffect, useState } from "react";
 import { onAuthStateChanged, signInAnonymously, User, setPersistence, browserSessionPersistence } from "firebase/auth";
-import { auth } from "@/firebase";
+import { auth } from "./firebase";
 
 type AuthContextType = {
   user: User | null;

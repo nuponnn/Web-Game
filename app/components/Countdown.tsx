@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useServerTimeOffset } from "../lib/useServerTime";
 
 interface CountdownProps {
@@ -12,8 +12,15 @@ export function Countdown({ endsAt, onExpire }: CountdownProps) {
   const [remainingMs, setRemainingMs] = useState(() => endsAt - Date.now());
   const [hasExpired, setHasExpired] = useState(false);
 
+  // เก็บ onExpire ไว้ใน ref กัน effect ข้างล่าง re-subscribe ทุกครั้งที่ parent re-render
+  // (parent ส่ง inline function ใหม่ทุก render -> ถ้าใส่ใน deps interval จะ restart บ่อย)
+  const onExpireRef = useRef(onExpire);
   useEffect(() => {
-   if (hasExpired) return;// reset ถ้า endsAt เปลี่ยน (รอบใหม่)
+    onExpireRef.current = onExpire;
+  }, [onExpire]);
+
+  useEffect(() => {
+    if (hasExpired) return; // reset ถ้า endsAt เปลี่ยน (รอบใหม่)
 
     const tick = () => {
       const serverNow = Date.now() + offset;
@@ -21,17 +28,20 @@ export function Countdown({ endsAt, onExpire }: CountdownProps) {
       setRemainingMs(remaining);
 
       if (remaining <= 0) {
-        setHasExpired((already) => {
-          if (!already && onExpire) onExpire();
-          return true;
-        });
+        setHasExpired(true);
       }
     };
 
     tick(); // เรียกทันทีไม่ต้องรอ interval แรก
     const id = setInterval(tick, 250); // ทุก 250ms พอให้ตาเห็นลื่น ไม่กิน CPU เกินจำเป็น
     return () => clearInterval(id);
-  }, [endsAt, offset, onExpire]);
+  }, [endsAt, offset, hasExpired]);
+
+  // เรียก onExpire แบบ effect แยก ตอน hasExpired เพิ่ง flip เป็น true
+  // (ไม่เรียก inside state updater กัน React StrictMode เรียก updater ซ้ำ 2 รอบ)
+  useEffect(() => {
+    if (hasExpired) onExpireRef.current?.();
+  }, [hasExpired]);
 
   const totalSeconds = Math.ceil(remainingMs / 1000);
   const minutes = Math.floor(totalSeconds / 60);

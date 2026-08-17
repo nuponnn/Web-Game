@@ -2,14 +2,15 @@
 import { useEffect, useState } from "react";
 import { get, onValue, ref } from "firebase/database";
 import { startGame, kickPlayer } from "@/app/lib/gameFunction";
-import { rldb } from "@/firebase";
+import { rldb } from "@/app/lib/firebase";
 import { useAuth } from "@/app/lib/useAuth";
 import type { Room } from "@/app/lib/useRoom";
 
-type LocationItem = {
-  id: string;
-  name: string;
-};
+type LocationItem = { id: string; name: string };
+
+// ข้อมูลสถานที่ที่เลือก (subscribe จาก locations/{id}) — ใช้โชว์ชื่อ + roles
+// ให้ทุกคนในห้องเห็น (รวม host ที่ไม่ใช่ admin / ผู้เล่นทั่วไปด้วย)
+type LocationInfo = { name: string; roles: string[] };
 
 export default function LobbyView({
   room,
@@ -27,7 +28,9 @@ export default function LobbyView({
   const [selectedLocationId, setSelectedLocationId] = useState(
     room.selectedLocationId ?? ""
   );
+  const [locationInfo, setLocationInfo] = useState<LocationInfo | null>(null);
   const [spyCount, setSpyCount] = useState(room.spyCount ?? 1);
+  const [jokerCount, setJokerCount] = useState(room.jokerCount ?? 0);
   // ระยะเวลาหา spy (ms) - default 8 นาที
   const [roundDurationMin, setRoundDurationMin] = useState(
     Math.round((room.roundDuration ?? 8 * 60 * 1000) / 60 / 1000)
@@ -41,6 +44,9 @@ export default function LobbyView({
 
   const isHost = uid === room.hostUid;
   const playerList = Object.entries(room.players); // [uid, playerData][]
+
+  // Effective selected location: admin hosts use local state, others use room value
+  const effectiveLocationId = isHost ? selectedLocationId : (room.selectedLocationId ?? "");
 
   // host ที่เป็น admin เท่านั้น: โหลดลิสต์ location ที่เปิดใช้งานอยู่ ให้เลือกได้ว่า
   // ห้องนี้จะเล่นสถานที่ไหน (ไม่เลือก = สุ่มเหมือนเดิม)
@@ -87,6 +93,27 @@ export default function LobbyView({
     };
   }, [isHost, user]);
 
+  // Subscribe to selected location's name + roles for all players to see
+  useEffect(() => {
+    if (!effectiveLocationId) {
+      setLocationInfo(null);
+      return;
+    }
+    let cancelled = false;
+    const unsub = onValue(
+      ref(rldb, `locations/${effectiveLocationId}`),
+      (snap) => {
+        if (cancelled) return;
+        const val = snap.val() as LocationInfo | null;
+        setLocationInfo(val ?? null);
+      }
+    );
+    return () => {
+      cancelled = true;
+      unsub();
+    };
+  }, [effectiveLocationId]);
+
   async function handleStart() {
     setStarting(true);
     setError("");
@@ -94,6 +121,7 @@ export default function LobbyView({
       await startGame(roomId, {
         locationId: selectedLocationId || undefined,
         spyCount,
+        jokerCount,
         roundDuration: roundDurationMin * 60 * 1000, // แปลงเป็น ms
         voteDuration: voteDurationSec * 1000, // แปลงเป็น ms
       });
@@ -142,6 +170,27 @@ export default function LobbyView({
         ))}
       </ul>
 
+      {/* แสดง Roles ของสถานที่ที่เลือก */}
+      {locationInfo && locationInfo.roles.length > 0 && (
+        <div style={{ margin: "12px 0", padding: 12, background: "#f0f8ff", borderRadius: 8 }}>
+          <p style={{ fontWeight: "bold", margin: "0 0 6px" }}>
+            สถานที่: {locationInfo.name}
+          </p>
+          <p style={{ margin: "0 0 4px", color: "#555", fontSize: 13 }}>
+            Roles ({locationInfo.roles.length}):
+          </p>
+          <ul style={{ margin: 0, paddingLeft: 20 }}>
+            {locationInfo.roles.map((role) => (
+              <li key={role}>{role}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {selectedLocationId && locationInfo === null && (
+        <p style={{ color: "#999", fontSize: 13 }}>กำลังโหลดข้อมูลสถานที่...</p>
+      )}
+
       {isHost && isAdminHost && (
         <div style={{ margin: "16px 0", padding: 12, border: "1px solid #ccc" }}>
           <label>
@@ -183,6 +232,27 @@ export default function LobbyView({
           </label>
           <p style={{ color: "#666", fontSize: 13 }}>
             ถ้ามี Spy มากกว่าครึ่งห้องเกมจะยาก (server กันไว้ไม่ให้เกินผู้เล่น - 1)
+          </p>
+        </div>
+      )}
+
+      {isHost && (
+        <div style={{ margin: "16px 0", padding: 12, border: "1px solid #ccc" }}>
+          <label>
+            จำนวน Joker:{" "}
+            <select
+              value={jokerCount}
+              onChange={(e) => setJokerCount(Number(e.target.value))}
+            >
+              {[0, 1, 2, 3, 4, 5].map((n) => (
+                <option key={n} value={n}>
+                  {n} คน
+                </option>
+              ))}
+            </select>
+          </label>
+          <p style={{ color: "#666", fontSize: 13 }}>
+            Joker เห็นสถานที่เหมือนผู้เล่น แต่ถ้าโดนโหวตออก Joker จะชนะ (ต้องมีคนปกติอย่างน้อย 1 คน)
           </p>
         </div>
       )}

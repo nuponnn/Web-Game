@@ -1,14 +1,15 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getDatabase, ref, onValue } from "firebase/database";
 
-// subscribe ทั้ง room object เดียว ง่ายสุดสำหรับ MVP
-// (ถ้าห้องใหญ่ขึ้น/ข้อมูลเยอะขึ้น ค่อยแยก subscribe เป็นราย path ตามที่วางแผนไว้ก่อนหน้า)
+// subscribe ทั้ง room object เดียว (public) + roomPrivate/{roomId}/{uid} (ของตัวเอง)
+// แล้ว merge ข้อมูลลับของเราเข้าไปใน room เพื่อให้ View ใช้เหมือนเดิม
+//
+// หมายเหตุ: ข้อมูลลับ (location/role/isSpy/isJoker) ไม่ได้อยู่ใน rooms/{roomId} แล้ว
+// เพราะ security rules cascade — rule ที่ parent อนุญาตแล้ว child rule กันไม่ได้
+// ต้องแยกไปอยู่ roomPrivate/{roomId}/{uid} ซึ่งเปิดอ่านได้เฉพาะเจ้าของ
+// (ดู functions/src/game/startGame.ts + database.rules.json)
 
-// type ให้ตรงกับโครงสร้างที่ backend เขียนไว้ (functions/src/lib/roomState.ts)
-// สาเหตุที่ก่อนหน้านี้ room ติด "never": useState(null) ทำให้ type เป็นแค่ null
-// พอตรวจ !room แล้ว TS มองว่าเหลือแต่ค่า null -> ยืนยันว่า "ไม่มีค่า" เสมอ
-// ต้องประกาศ useState<Room | null> เพื่อให้ตอนตรวจ !room แล้วได้ type Room แทน
 export type Room = {
   hostUid: string;
   status: "lobby" | "playing" | "voting" | "reveal" | "ended";
@@ -17,43 +18,110 @@ export type Room = {
   locationId?: string;
   selectedLocationId?: string; // admin ตั้งไว้ตอนสร้างห้อง
   spyCount?: number; // จำนวน spy ที่ host/admin กำหนด (default 1)
+  jokerCount?: number; // จำนวน joker ที่ host กำหนด (default 0, ช่วง 0-5)
   roundDuration?: number; // เวลาหา spy (ms) ที่ host กำหนด (default 8 นาที)
   voteDuration?: number; // เวลาโหวต (ms) ที่ host กำหนด (default 30 วินาที)
   players: Record<
     string,
-    { name: string; online: boolean; isSpy?: boolean; role?: string; joinedAt: number }
+    { name: string; online: boolean; isSpy?: boolean; isJoker?: boolean; role?: string; joinedAt: number }
   >;
   round?: { startedAt: number; duration: number; endsAt: number; voteEndsAt?: number };
-  // voterUid -> { targetUid, votedAt }
-  votes?: Record<string, { targetUid: string; votedAt: number }>;
-  result?: { winner: "players" | "spy"; spyUids: string[]; votedOutUid: string | null };
+  // voterUid -> { targetUid, votedAt } (targetUid = null หมายถึง skip)
+  votes?: Record<string, { targetUid: string | null; votedAt: number }>;
+  result?: { winner: "players" | "spy" | "joker"; spyUids: string[]; jokerUids: string[]; votedOutUid: string | null };
 };
 
-export function useRoom(roomId: string | null) {
+// ข้อมูลลับของเรา (จาก roomPrivate/{roomId}/{uid}) — merge เข้า room.players[uid] + room.location
+export type MyPrivateData = {
+  isSpy?: boolean;
+  isJoker?: boolean;
+  role?: string;
+  location?: string;
+};
+
+export function useRoom(roomId: string | null, uid?: string | null) {
   const [room, setRoom] = useState<Room | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [myPrivate, setMyPrivate] = useState<MyPrivateData | null>(null);
+  const [roomLoaded, setRoomLoaded] = useState(false);
+  const [privLoaded, setPrivLoaded] = useState(false);
 
   useEffect(() => {
     if (!roomId) return;
-    
+    let cancelled = false;
+    const db = getDatabase();
 
-    const roomRef = ref(getDatabase(), `rooms/${roomId}`);
-    const unsub = onValue(
+    // reset state ตอนเปลี่ยนห้อง/user กันข้อมูลเก่าค้าง
+    setRoom(null);
+    setMyPrivate(null);
+    setRoomLoaded(false);
+    setPrivLoaded(false);
+
+    const roomRef = ref(db, `rooms/${roomId}`);
+    const unsubRoom = onValue(
       roomRef,
       (snap) => {
+        if (cancelled) return;
         setRoom(snap.val() as Room | null);
-        setLoading(false);
+        setRoomLoaded(true);
       },
       (error) => {
-        // จะเจอ error ตรงนี้ถ้า security rules ปฏิเสธการอ่าน เช่น
-        // พยายามอ่าน location ทั้งที่เป็นสปาย - ปกติของระบบ ไม่ต้อง alert user
+        // จะเจอ error ตรงนี้ถ้า security rules ปฏิเสธการอ่าน - ปกติของระบบ
         console.error("useRoom error:", error);
-        setLoading(false);
+        setRoomLoaded(true);
       }
     );
 
-    return () => unsub();
-  }, [roomId]);
+    let unsubPriv: (() => void) | null = null;
+    if (uid) {
+      const privRef = ref(db, `roomPrivate/${roomId}/${uid}`);
+      unsubPriv = onValue(
+        privRef,
+        (snap) => {
+          if (cancelled) return;
+          setMyPrivate(snap.val() as MyPrivateData | null);
+          setPrivLoaded(true);
+        },
+        (error) => {
+          if (cancelled) return;
+          console.error("useRoom private error:", error);
+          setPrivLoaded(true);
+        }
+      );
+    } else {
+      // ยังไม่มี uid (auth กำลังโหลด) -> ถือว่า private ว่างไว้ก่อน
+      setPrivLoaded(true);
+    }
 
-  return { room, loading };
+    return () => {
+      cancelled = true;
+      unsubRoom();
+      unsubPriv?.();
+    };
+  }, [roomId, uid]);
+
+  // merge ข้อมูลลับของเราลงใน room: players[uid] ได้ isSpy/isJoker/role,
+  // room.location ได้ค่าจาก private (ระหว่างเล่น) หรือค่าสาธารณะ (ตอน reveal)
+  const mergedRoom = useMemo<Room | null>(() => {
+    if (!room) return null;
+    if (!uid || !myPrivate) return room;
+
+    const players = { ...room.players };
+    if (players[uid]) {
+      players[uid] = {
+        ...players[uid],
+        isSpy: myPrivate.isSpy,
+        isJoker: myPrivate.isJoker,
+        role: myPrivate.role,
+      };
+    }
+
+    return {
+      ...room,
+      // public location (เขียนตอน reveal ให้ทุกคนเห็น) ชนะก่อน; ระหว่างเล่นใช้ของตัวเอง
+      location: room.location ?? myPrivate.location ?? undefined,
+      players,
+    };
+  }, [room, myPrivate, uid]);
+
+  return { room: mergedRoom, loading: !roomLoaded || !privLoaded };
 }

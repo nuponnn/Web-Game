@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { get, ref } from "firebase/database";
 import { signOut } from "firebase/auth";
-import { auth, rldb } from "@/firebase";
+import { auth, rldb } from "@/app/lib/firebase";
 import { useAuth } from "@/app/lib/useAuth";
 import { listAdmins, addAdmin, removeAdmin, AdminItem } from "@/app/lib/adminFunctions";
 

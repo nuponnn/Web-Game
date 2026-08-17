@@ -1,7 +1,7 @@
 "use client";
 import { useEffect } from "react";
 import {  ref, onDisconnect, set, remove  } from "firebase/database";
-import { rldb } from "@/firebase";
+import { rldb } from "./firebase";
 // แจ้ง backend ว่าผู้เล่นคนนี้กำลังอยู่ในห้องผ่าน path presence/{roomId}/{uid}
 // เมื่อ client หลุดการเชื่อมต่อ (ปิด tab / internet ตัด) onDisconnect จะลบ presence
 // ออกให้เอง ทำให้ backend ลบห้องได้ทันทีถ้า host หลุด หรือไม่มีใครออนไลน์เหลือ

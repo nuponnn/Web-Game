@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { get, onValue, ref } from "firebase/database";
 import { createRoom, joinRoom } from "./lib/gameFunction";
 import { useAuth } from "./lib/useAuth";
-import { rldb } from "@/firebase";
+import { rldb } from "@/app/lib/firebase";
 
 type LocationItem = { id: string; name: string };
 
@@ -18,6 +18,7 @@ export default function Home() {
   const [locations, setLocations] = useState<LocationItem[]>([]);
   const [selectedLocationId, setSelectedLocationId] = useState("");
   const [spyCount, setSpyCount] = useState(1);
+  const [jokerCount, setJokerCount] = useState(0);
   const [roundDurationMin, setRoundDurationMin] = useState(8); // default 8 นาที
   const [voteDurationSec, setVoteDurationSec] = useState(30); // default 30 วินาที
   const [creating, setCreating] = useState(false);
@@ -81,10 +82,12 @@ export default function Home() {
           ? {
               locationId: selectedLocationId || undefined,
               spyCount,
+              jokerCount,
               roundDuration: roundDurationMin * 60 * 1000,
               voteDuration: voteDurationSec * 1000,
             }
           : {
+              jokerCount,
               roundDuration: roundDurationMin * 60 * 1000,
               voteDuration: voteDurationSec * 1000,
             }
@@ -139,7 +142,18 @@ export default function Home() {
         </div>
       )}
 
+      {/* host ทุกคนกำหนดได้: จำนวน Joker + เวลาหา Spy + เวลาโหวต */}
       <div style={{ display: "flex", gap: 12, margin: "8px 0" }}>
+        <label>
+          จำนวน Joker:{" "}
+          <select value={jokerCount} onChange={(e) => setJokerCount(Number(e.target.value))}>
+            {[0, 1, 2, 3, 4, 5].map((n) => (
+              <option key={n} value={n}>
+                {n} คน
+              </option>
+            ))}
+          </select>
+        </label>
         <label>
           เวลาหา Spy:{" "}
           <select

@@ -39,9 +39,12 @@ export const endRound = onCall(async (request) => {
 
   // ระยะเวลาโหวต (ms): ใช้ค่าที่ host ตั้งไว้ในห้อง หรือ default 30 วินาที
   // จำกัดช่วง 10-120 วินาที กันตั้งค่าผิดพลาด
-  const MIN_VOTE_MS = 10 * 1000;   // 10 วินาที
-  const MAX_VOTE_MS = 120 * 1000;  // 2 นาที
-  const voteDurationMs = Math.max(MIN_VOTE_MS, Math.min(MAX_VOTE_MS, room.voteDuration ?? DEFAULT_VOTE_DURATION_MS));
+  const MIN_VOTE_MS = 10 * 1000; // 10 วินาที
+  const MAX_VOTE_MS = 120 * 1000; // 2 นาที
+  const voteDurationMs = Math.max(
+    MIN_VOTE_MS,
+    Math.min(MAX_VOTE_MS, room.voteDuration ?? DEFAULT_VOTE_DURATION_MS)
+  );
 
   const voteEndsAt = Date.now() + voteDurationMs;
 

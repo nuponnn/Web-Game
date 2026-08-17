@@ -43,6 +43,15 @@ export const cleanupRooms = onSchedule(
       }
     }
 
+    // ล้าง roomPrivate ค้างของห้องที่โดนลบ (ข้อมูลลับของผู้เล่นไม่ควรค้างอยู่)
+    const privateSnap = await db.ref("roomPrivate").once("value");
+    const privateRooms = privateSnap.val() as Record<string, unknown> | null;
+    for (const roomId of Object.keys(privateRooms || {})) {
+      if (!validRoomIds.has(roomId)) {
+        await db.ref(`roomPrivate/${roomId}`).remove();
+      }
+    }
+
     logger.info(`cleanupRooms: deleted ${deleted} stale rooms`);
   }
 );
