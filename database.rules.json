@@ -1,0 +1,52 @@
+{
+  "rules": {
+    "locations": {
+      ".indexOn": ["active"],
+      ".read": "auth != null",
+      "$locationId": {
+        ".read": "auth != null",
+        ".write": "auth != null && root.child('admins/' + auth.uid).exists()"
+      }
+    },
+
+    "admins": {
+      "$uid": {
+        ".read": "auth != null && $uid === auth.uid",
+        ".write": "auth != null && $uid === auth.uid"
+      }
+    },
+
+    "rooms": {
+      "$roomId": {
+        ".read": "auth != null",
+
+        ".write": false,
+
+        "location": {
+  
+          ".read": "auth != null && root.child('rooms/' + $roomId + '/players/' + auth.uid + '/isSpy').val() === false"
+        },
+
+        "players": {
+          "$uid": {
+            "role": {
+              ".read": "auth.uid === $uid"
+            },
+            "isSpy": {
+              ".read": "auth.uid === $uid"
+            }
+          }
+        }
+      }
+    },
+
+    "presence": {
+      "$roomId": {
+        "$uid": {
+          ".read": "auth != null && $uid === auth.uid",
+          ".write": "auth != null && $uid === auth.uid"
+        }
+      }
+    }
+  }
+}

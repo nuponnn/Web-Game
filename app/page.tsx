@@ -1,69 +1,187 @@
-import Image from "next/image";
+"use client";
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { get, onValue, ref } from "firebase/database";
+import { createRoom, joinRoom } from "./lib/gameFunction";
+import { useAuth } from "./lib/useAuth";
+import { rldb } from "@/firebase";
+
+type LocationItem = { id: string; name: string };
 
 export default function Home() {
+  const router = useRouter();
+  const { user, loading } = useAuth();
+  const [name, setName] = useState("");
+  const [roomId, setRoomId] = useState("");
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [locations, setLocations] = useState<LocationItem[]>([]);
+  const [selectedLocationId, setSelectedLocationId] = useState("");
+  const [spyCount, setSpyCount] = useState(1);
+  const [roundDurationMin, setRoundDurationMin] = useState(8); // default 8 นาที
+  const [voteDurationSec, setVoteDurationSec] = useState(30); // default 30 วินาที
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState("");
+
+  // ถ้าเป็น admin (Google + อยู่ใน admins/{uid}) ให้โหลดลิสต์ location ที่ active
+  // เพื่อเลือกตอนสร้างห้องได้เอง
+  useEffect(() => {
+    if (loading || !user || user.isAnonymous) return;
+
+    let cancelled = false;
+    let unsub: (() => void) | null = null;
+
+    get(ref(rldb, `admins/${user.uid}`))
+      .then((snap) => {
+        if (cancelled) return;
+        if (!snap.exists()) return; // ไม่ใช่ admin -> สร้างห้องแบบสุ่ม location
+        setIsAdmin(true);
+
+        unsub = onValue(
+          ref(rldb, "locations"),
+          (locationsSnap) => {
+            if (cancelled) return;
+            const val = locationsSnap.val() as
+              | Record<string, { name: string; active: boolean }>
+              | null;
+            const list = Object.entries(val || {})
+              .filter(([, loc]) => loc.active === true)
+              .map(([id, loc]) => ({ id, name: loc.name }));
+            list.sort((a, b) => (a.name < b.name ? -1 : 1));
+            setLocations(list);
+          },
+          (err) => {
+            if (cancelled) return;
+            console.error("load locations error:", err);
+          }
+        );
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error("admin check error:", err);
+      });
+
+    return () => {
+      cancelled = true;
+      unsub?.();
+    };
+  }, [loading, user]);
+
+  if (loading) return <div>กำลังเข้าสู่ระบบ...</div>;
+
+  async function handleCreate() {
+    setCreating(true);
+    setError("");
+    try {
+      // ส่งตัวเลือก location/spy เฉพาะตอนเป็น admin (ไม่ใช่ admin -> สุ่ม/ค่า default)
+      // roundDuration/voteDuration ส่งทุกคน (host ทุกคนกำหนดเวลาได้)
+      const res = await createRoom(
+        name,
+        isAdmin
+          ? {
+              locationId: selectedLocationId || undefined,
+              spyCount,
+              roundDuration: roundDurationMin * 60 * 1000,
+              voteDuration: voteDurationSec * 1000,
+            }
+          : {
+              roundDuration: roundDurationMin * 60 * 1000,
+              voteDuration: voteDurationSec * 1000,
+            }
+      );
+      router.push(`/room/${res.roomId}`);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "สร้างห้องไม่สำเร็จ");
+      setCreating(false);
+    }
+  }
+
+  async function handleJoin() {
+    setError("");
+    try {
+      await joinRoom(roomId, name);
+      router.push(`/room/${roomId}`);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "เข้าร่วมห้องไม่สำเร็จ");
+    }
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <div>
+      <input value={name} onChange={(e) => setName(e.target.value)} placeholder="ชื่อ" />
+
+      {isAdmin && (
+        <div style={{ display: "flex", gap: 12, margin: "8px 0" }}>
+          <label>
+            สถานที่:{" "}
+            <select
+              value={selectedLocationId}
+              onChange={(e) => setSelectedLocationId(e.target.value)}
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+              <option value="">สุ่ม</option>
+              {locations.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            จำนวน Spy:{" "}
+            <select value={spyCount} onChange={(e) => setSpyCount(Number(e.target.value))}>
+              {[1, 2, 3, 4, 5, 6, 7].map((n) => (
+                <option key={n} value={n}>
+                  {n} คน
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+      )}
+
+      <div style={{ display: "flex", gap: 12, margin: "8px 0" }}>
+        <label>
+          เวลาหา Spy:{" "}
+          <select
+            value={roundDurationMin}
+            onChange={(e) => setRoundDurationMin(Number(e.target.value))}
           >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15].map((m) => (
+              <option key={m} value={m}>
+                {m} นาที
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          เวลาโหวต:{" "}
+          <select
+            value={voteDurationSec}
+            onChange={(e) => setVoteDurationSec(Number(e.target.value))}
           >
-            Documentation
-          </a>
-        </div>
-      </main>
+            {[10, 15, 20, 30, 45, 60, 90, 120].map((s) => (
+              <option key={s} value={s}>
+                {s >= 60 ? `${s / 60} นาที` : `${s} วินาที`}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <button onClick={handleCreate} disabled={creating || name.trim().length === 0}>
+        {creating ? "กำลังสร้าง..." : "Create Room"}
+      </button>
+
+      <div style={{ margin: "8px 0" }}>
+        <input value={roomId} onChange={(e) => setRoomId(e.target.value)} placeholder="Room ID" />
+        <button onClick={handleJoin}>Join Room</button>
+      </div>
+
+      {error && <p style={{ color: "red" }}>{error}</p>}
+
+      <p>
+        <Link href="/admin">Admin</Link>
+      </p>
     </div>
   );
 }
