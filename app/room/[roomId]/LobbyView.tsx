@@ -7,9 +7,6 @@ import { useAuth } from "@/app/lib/useAuth";
 import type { Room } from "@/app/lib/useRoom";
 
 type LocationItem = { id: string; name: string };
-
-// ข้อมูลสถานที่ที่เลือก (subscribe จาก locations/{id}) — ใช้โชว์ชื่อ + roles
-// ให้ทุกคนในห้องเห็น (รวม host ที่ไม่ใช่ admin / ผู้เล่นทั่วไปด้วย)
 type LocationInfo = { name: string; roles: string[] };
 
 export default function LobbyView({
@@ -31,25 +28,22 @@ export default function LobbyView({
   const [locationInfo, setLocationInfo] = useState<LocationInfo | null>(null);
   const [spyCount, setSpyCount] = useState(room.spyCount ?? 1);
   const [jokerCount, setJokerCount] = useState(room.jokerCount ?? 0);
-  // ระยะเวลาหา spy (ms) - default 8 นาที
   const [roundDurationMin, setRoundDurationMin] = useState(
     Math.round((room.roundDuration ?? 8 * 60 * 1000) / 60 / 1000)
   );
-  // ระยะเวลาโหวต (วินาที) - default 30 วินาที
   const [voteDurationSec, setVoteDurationSec] = useState(
     Math.round((room.voteDuration ?? 30 * 1000) / 1000)
   );
   const [isAdminHost, setIsAdminHost] = useState(false);
-  const [kicking, setKicking] = useState<string | null>(null); // uid ที่กำลังเตะ
+  const [kicking, setKicking] = useState<string | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
 
   const isHost = uid === room.hostUid;
-  const playerList = Object.entries(room.players); // [uid, playerData][]
+  const playerList = Object.entries(room.players);
+  const effectiveLocationId = isHost
+    ? selectedLocationId
+    : room.selectedLocationId ?? "";
 
-  // Effective selected location: admin hosts use local state, others use room value
-  const effectiveLocationId = isHost ? selectedLocationId : (room.selectedLocationId ?? "");
-
-  // host ที่เป็น admin เท่านั้น: โหลดลิสต์ location ที่เปิดใช้งานอยู่ ให้เลือกได้ว่า
-  // ห้องนี้จะเล่นสถานที่ไหน (ไม่เลือก = สุ่มเหมือนเดิม)
   useEffect(() => {
     if (!isHost || !user || user.isAnonymous) return;
 
@@ -59,7 +53,7 @@ export default function LobbyView({
     get(ref(rldb, `admins/${user.uid}`))
       .then((snap) => {
         if (cancelled) return;
-        if (!snap.exists()) return; // ไม่ใช่ admin -> ไม่ได้เลือก location
+        if (!snap.exists()) return;
         setIsAdminHost(true);
 
         unsub = onValue(
@@ -93,7 +87,6 @@ export default function LobbyView({
     };
   }, [isHost, user]);
 
-  // Subscribe to selected location's name + roles for all players to see
   useEffect(() => {
     if (!effectiveLocationId) {
       setLocationInfo(null);
@@ -122,11 +115,9 @@ export default function LobbyView({
         locationId: selectedLocationId || undefined,
         spyCount,
         jokerCount,
-        roundDuration: roundDurationMin * 60 * 1000, // แปลงเป็น ms
-        voteDuration: voteDurationSec * 1000, // แปลงเป็น ms
+        roundDuration: roundDurationMin * 60 * 1000,
+        voteDuration: voteDurationSec * 1000,
       });
-      // ไม่ต้องทำอะไรต่อ - useRoom จะเห็น status เปลี่ยนเป็น "playing" เอง
-      // แล้ว RoomPage จะ switch ไป PlayingView อัตโนมัติ
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "เริ่มเกมไม่สำเร็จ");
       setStarting(false);
@@ -138,7 +129,6 @@ export default function LobbyView({
     setError("");
     try {
       await kickPlayer(roomId, targetUid);
-      // ไม่ต้องทำอะไรต่อ - useRoom subscribe จะอัปเดต players เอง
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "เตะผู้เล่นไม่สำเร็จ");
     } finally {
@@ -147,171 +137,245 @@ export default function LobbyView({
   }
 
   return (
-    <div>
-      <h2>ห้อง {roomId}</h2>
-      <p>ผู้เล่นในห้อง ({playerList.length} คน)</p>
-      <ul>
-        {playerList.map(([playerUid, player]) => (
-          <li key={playerUid}>
-            {player.name}
-            {playerUid === room.hostUid && " (host)"}
-            {!player.online && " (ออฟไลน์)"}
-            {/* ปุ่มเตะ: host เตะได้เฉพาะคนอื่น ห้ามเตะตัวเอง */}
-            {isHost && playerUid !== uid && (
-              <button
-                onClick={() => handleKick(playerUid)}
-                disabled={kicking !== null}
-                style={{ marginLeft: 8, color: "red" }}
+    <main className="flex min-h-dvh flex-col items-center justify-center px-4 py-12">
+      <div className="w-full max-w-sm space-y-6">
+        {/* Room Code */}
+        <div className="text-center">
+          <p className="text-xs font-medium uppercase tracking-wide text-text-muted">
+            Room
+          </p>
+          <h1 className="mt-1 text-2xl font-bold tracking-widest text-text">
+            {roomId}
+          </h1>
+        </div>
+
+        {/* Players */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-medium text-text-secondary">
+              ผู้เล่น
+            </h2>
+            <span className="text-xs text-text-muted">
+              {playerList.length}/8
+            </span>
+          </div>
+          <div className="space-y-1.5">
+            {playerList.map(([playerUid, player]) => (
+              <div
+                key={playerUid}
+                className="flex items-center justify-between rounded-[var(--radius-md)] border border-border bg-surface px-4 py-2.5"
               >
-                {kicking === playerUid ? "กำลังเตะ..." : "เตะ"}
-              </button>
-            )}
-          </li>
-        ))}
-      </ul>
-
-      {/* แสดง Roles ของสถานที่ที่เลือก */}
-      {locationInfo && locationInfo.roles.length > 0 && (
-        <div style={{ margin: "12px 0", padding: 12, background: "#f0f8ff", borderRadius: 8 }}>
-          <p style={{ fontWeight: "bold", margin: "0 0 6px" }}>
-            สถานที่: {locationInfo.name}
-          </p>
-          <p style={{ margin: "0 0 4px", color: "#555", fontSize: 13 }}>
-            Roles ({locationInfo.roles.length}):
-          </p>
-          <ul style={{ margin: 0, paddingLeft: 20 }}>
-            {locationInfo.roles.map((role) => (
-              <li key={role}>{role}</li>
+                <div className="flex items-center gap-2.5">
+                  {/* Online indicator */}
+                  <span
+                    className={`h-2 w-2 rounded-full ${
+                      player.online ? "bg-success" : "bg-text-muted"
+                    }`}
+                  />
+                  <span className="text-sm font-medium text-text">
+                    {player.name}
+                  </span>
+                  {playerUid === room.hostUid && (
+                    <span className="rounded-[var(--radius-sm)] bg-accent/10 px-1.5 py-0.5 text-[10px] font-medium text-accent">
+                      host
+                    </span>
+                  )}
+                  {playerUid === uid && (
+                    <span className="text-[10px] text-text-muted">(คุณ)</span>
+                  )}
+                </div>
+                {isHost && playerUid !== uid && (
+                  <button
+                    onClick={() => handleKick(playerUid)}
+                    disabled={kicking !== null}
+                    className="text-xs text-text-muted transition-colors hover:text-danger"
+                  >
+                    {kicking === playerUid ? "..." : "x"}
+                  </button>
+                )}
+              </div>
             ))}
-          </ul>
+          </div>
         </div>
-      )}
 
-      {selectedLocationId && locationInfo === null && (
-        <p style={{ color: "#999", fontSize: 13 }}>กำลังโหลดข้อมูลสถานที่...</p>
-      )}
-
-      {isHost && isAdminHost && (
-        <div style={{ margin: "16px 0", padding: 12, border: "1px solid #ccc" }}>
-          <label>
-            สถานที่ที่จะเล่น (ไม่เลือก = สุ่ม):{" "}
-            <select
-              value={selectedLocationId}
-              onChange={(e) => setSelectedLocationId(e.target.value)}
-            >
-              <option value="">สุ่ม</option>
-              {locations.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          {locations.length === 0 && (
-            <p style={{ color: "orange" }}>
-              ยังไม่มี location ที่เปิดใช้งานอยู่ ไปเพิ่ม/เปิดที่หน้า Admin ก่อน
+        {/* Location Info */}
+        {locationInfo && locationInfo.roles.length > 0 && (
+          <div className="rounded-[var(--radius-md)] border border-accent/20 bg-accent-light p-4">
+            <p className="text-sm font-medium text-accent">
+              {locationInfo.name}
             </p>
-          )}
-        </div>
-      )}
-
-      {isHost && (
-        <div style={{ margin: "16px 0", padding: 12, border: "1px solid #ccc" }}>
-          <label>
-            จำนวน Spy:{" "}
-            <select
-              value={spyCount}
-              onChange={(e) => setSpyCount(Number(e.target.value))}
-            >
-              {[1, 2, 3, 4, 5, 6, 7].map((n) => (
-                <option key={n} value={n}>
-                  {n} คน
-                </option>
+            <p className="mt-0.5 text-xs text-text-secondary">
+              {locationInfo.roles.length} roles
+            </p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {locationInfo.roles.map((role) => (
+                <span
+                  key={role}
+                  className="rounded-[var(--radius-sm)] bg-surface px-2 py-1 text-xs text-text-secondary"
+                >
+                  {role}
+                </span>
               ))}
-            </select>
-          </label>
-          <p style={{ color: "#666", fontSize: 13 }}>
-            ถ้ามี Spy มากกว่าครึ่งห้องเกมจะยาก (server กันไว้ไม่ให้เกินผู้เล่น - 1)
-          </p>
-        </div>
-      )}
+            </div>
+          </div>
+        )}
 
-      {isHost && (
-        <div style={{ margin: "16px 0", padding: 12, border: "1px solid #ccc" }}>
-          <label>
-            จำนวน Joker:{" "}
-            <select
-              value={jokerCount}
-              onChange={(e) => setJokerCount(Number(e.target.value))}
+        {selectedLocationId && locationInfo === null && (
+          <p className="text-center text-xs text-text-muted">
+            กำลังโหลดข้อมูลสถานที่...
+          </p>
+        )}
+
+        {/* Host Settings */}
+        {isHost && (
+          <div className="space-y-3">
+            <button
+              onClick={() => setShowSettings(!showSettings)}
+              className="flex w-full items-center justify-between rounded-[var(--radius-md)] border border-border bg-surface px-4 py-3 text-sm font-medium text-text transition-colors hover:bg-bg-subtle"
             >
-              {[0, 1, 2, 3, 4, 5].map((n) => (
-                <option key={n} value={n}>
-                  {n} คน
-                </option>
-              ))}
-            </select>
-          </label>
-          <p style={{ color: "#666", fontSize: 13 }}>
-            Joker เห็นสถานที่เหมือนผู้เล่น แต่ถ้าโดนโหวตออก Joker จะชนะ (ต้องมีคนปกติอย่างน้อย 1 คน)
-          </p>
-        </div>
-      )}
+              <span>ตั้งค่าเกม</span>
+              <svg
+                className={`h-4 w-4 text-text-muted transition-transform ${
+                  showSettings ? "rotate-180" : ""
+                }`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
 
-      {isHost && (
-        <div style={{ margin: "16px 0", padding: 12, border: "1px solid #ccc" }}>
-          <label>
-            เวลาหา Spy:{" "}
-            <select
-              value={roundDurationMin}
-              onChange={(e) => setRoundDurationMin(Number(e.target.value))}
-            >
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15].map((m) => (
-                <option key={m} value={m}>
-                  {m} นาที
-                </option>
-              ))}
-            </select>
-          </label>
-          <p style={{ color: "#666", fontSize: 13 }}>
-            ระยะเวลาที่ผู้เล่นมีเวลาค้นหาว่าใครเป็น Spy
-          </p>
-        </div>
-      )}
+            {showSettings && (
+              <div className="space-y-3 rounded-[var(--radius-md)] border border-border bg-surface p-4">
+                {isAdminHost && (
+                  <div className="space-y-1">
+                    <label className="block text-xs text-text-secondary">
+                      Location
+                    </label>
+                    <select
+                      value={selectedLocationId}
+                      onChange={(e) => setSelectedLocationId(e.target.value)}
+                      className="w-full rounded-[var(--radius-sm)] border border-border bg-surface px-3 py-2 text-sm text-text focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/20"
+                    >
+                      <option value="">Random</option>
+                      {locations.map((l) => (
+                        <option key={l.id} value={l.id}>
+                          {l.name}
+                        </option>
+                      ))}
+                    </select>
+                    {locations.length === 0 && (
+                      <p className="text-xs text-warning">
+                        No active locations. Add some in Admin first.
+                      </p>
+                    )}
+                  </div>
+                )}
 
-      {isHost && (
-        <div style={{ margin: "16px 0", padding: 12, border: "1px solid #ccc" }}>
-          <label>
-            เวลาโหวต:{" "}
-            <select
-              value={voteDurationSec}
-              onChange={(e) => setVoteDurationSec(Number(e.target.value))}
-            >
-              {[10, 15, 20, 30, 45, 60, 90, 120].map((s) => (
-                <option key={s} value={s}>
-                  {s >= 60 ? `${s / 60} นาที` : `${s} วินาที`}
-                </option>
-              ))}
-            </select>
-          </label>
-          <p style={{ color: "#666", fontSize: 13 }}>
-            ระยะเวลาที่ผู้เล่นต้องโหวตว่าใครเป็น Spy
-          </p>
-        </div>
-      )}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="block text-xs text-text-secondary">
+                      Spy count
+                    </label>
+                    <select
+                      value={spyCount}
+                      onChange={(e) => setSpyCount(Number(e.target.value))}
+                      className="w-full rounded-[var(--radius-sm)] border border-border bg-surface px-3 py-2 text-sm text-text focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/20"
+                    >
+                      {[1, 2, 3, 4, 5, 6, 7].map((n) => (
+                        <option key={n} value={n}>
+                          {n}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-xs text-text-secondary">
+                      Joker count
+                    </label>
+                    <select
+                      value={jokerCount}
+                      onChange={(e) => setJokerCount(Number(e.target.value))}
+                      className="w-full rounded-[var(--radius-sm)] border border-border bg-surface px-3 py-2 text-sm text-text focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/20"
+                    >
+                      {[0, 1, 2, 3, 4, 5].map((n) => (
+                        <option key={n} value={n}>
+                          {n}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-xs text-text-secondary">
+                      Spy time
+                    </label>
+                    <select
+                      value={roundDurationMin}
+                      onChange={(e) => setRoundDurationMin(Number(e.target.value))}
+                      className="w-full rounded-[var(--radius-sm)] border border-border bg-surface px-3 py-2 text-sm text-text focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/20"
+                    >
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15].map((m) => (
+                        <option key={m} value={m}>
+                          {m}m
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-xs text-text-secondary">
+                      Vote time
+                    </label>
+                    <select
+                      value={voteDurationSec}
+                      onChange={(e) => setVoteDurationSec(Number(e.target.value))}
+                      className="w-full rounded-[var(--radius-sm)] border border-border bg-surface px-3 py-2 text-sm text-text focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/20"
+                    >
+                      {[10, 15, 20, 30, 45, 60, 90, 120].map((s) => (
+                        <option key={s} value={s}>
+                          {s >= 60 ? `${s / 60}m` : `${s}s`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
-      {isHost ? (
-        <button onClick={handleStart} disabled={starting || playerList.length < 3}>
-          {starting ? "กำลังเริ่ม..." : "Start Game"}
-        </button>
-      ) : (
-        <p>รอ host เริ่มเกม...</p>
-      )}
+        {/* Start / Waiting */}
+        {isHost ? (
+          <button
+            onClick={handleStart}
+            disabled={starting || playerList.length < 3}
+            className="w-full rounded-[var(--radius-md)] bg-accent px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {starting
+              ? "กำลังเริ่ม..."
+              : playerList.length < 3
+                ? "ต้องมีอย่างน้อย 3 คน"
+                : "เริ่มเกม"}
+          </button>
+        ) : (
+          <div className="text-center">
+            <p className="text-sm text-text-secondary">รอ host เริ่มเกม...</p>
+            <div className="mt-2 flex justify-center gap-1">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-text-muted" />
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-text-muted [animation-delay:150ms]" />
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-text-muted [animation-delay:300ms]" />
+            </div>
+          </div>
+        )}
 
-      {isHost && playerList.length < 3 && (
-        <p>ต้องมีผู้เล่นอย่างน้อย 3 คนถึงจะเริ่มได้</p>
-      )}
-
-      {error && <p style={{ color: "red" }}>{error}</p>}
-    </div>
+        {/* Error */}
+        {error && (
+          <div className="rounded-[var(--radius-md)] bg-danger/10 px-4 py-3 text-sm text-danger">
+            {error}
+          </div>
+        )}
+      </div>
+    </main>
   );
 }

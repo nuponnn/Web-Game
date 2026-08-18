@@ -19,7 +19,11 @@ export default function RevealView({
   const result = room.result;
 
   if (!result) {
-    return <div>กำลังประมวลผล...</div>;
+    return (
+      <div className="flex min-h-dvh items-center justify-center">
+        <p className="text-sm text-text-secondary">กำลังประมวลผล...</p>
+      </div>
+    );
   }
 
   const spyNames = result.spyUids.map(
@@ -33,12 +37,15 @@ export default function RevealView({
     : null;
   const isHost = uid === room.hostUid;
 
+  const isPlayerWin = result.winner === "players";
+  const isJokerWin = result.winner === "joker";
+  const isSpyWin = result.winner === "spy";
+
   async function handlePlayAgain() {
     setResetting(true);
     setError("");
     try {
       await playAgain(roomId);
-      // สถานะห้องเปลี่ยนเป็น "lobby" -> RoomPage จะสลับไปแสดง LobbyView ให้อัตโนมัติ
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "เริ่มรอบใหม่ไม่สำเร็จ");
       setResetting(false);
@@ -46,35 +53,115 @@ export default function RevealView({
   }
 
   return (
-    <div>
-      <h2>
-        {result.winner === "players" ? "ผู้เล่นชนะ!" :
-         result.winner === "joker" ? "Joker ชนะ!" :
-         "Spy ชนะ!"}
-      </h2>
-      <p>สถานที่คือ: {room.location}</p>
-      <p>Spy คือ: {spyNames.join(", ")}</p>
-      {jokerNames.length > 0 && (
-        <p>Joker คือ: {jokerNames.join(", ")}</p>
-      )}
-      <p>
-        {votedOutName
-          ? result.winner === "joker"
-            ? `${votedOutName} เป็น Joker และโดนโหวตออก -> Joker ชนะ!`
-            : `คนที่โดนโหวตออก: ${votedOutName}`
-          : "คะแนนเสมอ ไม่มีใครถูกจับ"}
-      </p>
-      {isHost ? (
-        <p>
-          <button onClick={handlePlayAgain} disabled={resetting}>
-            {resetting ? "กำลังกลับเข้าห้อง..." : "กลับเข้าห้อง (เล่นรอบใหม่)"}
-          </button>{" "}
-          <button onClick={() => router.push("/")}>กลับหน้าแรก</button>
-        </p>
-      ) : (
-        <p>รอ host กดเริ่มรอบใหม่...</p>
-      )}
-      {error && <p style={{ color: "red" }}>{error}</p>}
-    </div>
+    <main className="flex min-h-dvh flex-col items-center justify-center px-4 py-12">
+      <div className="w-full max-w-sm space-y-6">
+        {/* Winner Badge */}
+        <div className="text-center">
+          <div
+            className={`mx-auto inline-flex h-16 w-16 items-center justify-center rounded-full ${
+              isPlayerWin
+                ? "bg-success-light"
+                : isJokerWin
+                  ? "bg-warning-light"
+                  : "bg-danger/10"
+            }`}
+          >
+            <span className="text-2xl">
+              {isPlayerWin ? "🎉" : isJokerWin ? "🃏" : "🕵️"}
+            </span>
+          </div>
+          <h1
+            className={`mt-3 text-xl font-bold ${
+              isPlayerWin
+                ? "text-success"
+                : isJokerWin
+                  ? "text-warning"
+                  : "text-danger"
+            }`}
+          >
+            {isPlayerWin
+              ? "ผู้เล่นชนะ!"
+              : isJokerWin
+                ? "Joker ชนะ!"
+                : "Spy ชนะ!"}
+          </h1>
+        </div>
+
+        {/* Result Details */}
+        <div className="space-y-2">
+          <div className="rounded-[var(--radius-md)] border border-border bg-surface px-4 py-3">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-text-muted">
+              สถานที่
+            </p>
+            <p className="mt-0.5 text-base font-medium text-text">
+              {room.location}
+            </p>
+          </div>
+
+          <div className="rounded-[var(--radius-md)] border border-border bg-surface px-4 py-3">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-text-muted">
+              Spy คือ
+            </p>
+            <p className="mt-0.5 text-base font-medium text-danger">
+              {spyNames.join(", ")}
+            </p>
+          </div>
+
+          {jokerNames.length > 0 && (
+            <div className="rounded-[var(--radius-md)] border border-border bg-surface px-4 py-3">
+              <p className="text-[10px] font-medium uppercase tracking-wide text-text-muted">
+                Joker คือ
+              </p>
+              <p className="mt-0.5 text-base font-medium text-warning">
+                {jokerNames.join(", ")}
+              </p>
+            </div>
+          )}
+
+          <div className="rounded-[var(--radius-md)] border border-border bg-surface px-4 py-3">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-text-muted">
+              ผลโหวต
+            </p>
+            <p className="mt-0.5 text-sm text-text">
+              {votedOutName
+                ? isJokerWin
+                  ? `${votedOutName} เป็น Joker และโดนโหวตออก`
+                  : `คนที่โดนโหวตออก: ${votedOutName}`
+                : "คะแนนเสมอ ไม่มีใครถูกจับ"}
+            </p>
+          </div>
+        </div>
+
+        {/* Actions */}
+        {isHost ? (
+          <div className="space-y-2">
+            <button
+              onClick={handlePlayAgain}
+              disabled={resetting}
+              className="w-full rounded-[var(--radius-md)] bg-accent px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {resetting ? "กำลังกลับเข้าห้อง..." : "เล่นรอบใหม่"}
+            </button>
+            <button
+              onClick={() => router.push("/")}
+              className="w-full rounded-[var(--radius-md)] border border-border bg-surface px-4 py-3 text-sm font-medium text-text transition-colors hover:bg-bg-subtle"
+            >
+              กลับหน้าแรก
+            </button>
+          </div>
+        ) : (
+          <p className="text-center text-sm text-text-secondary">
+            รอ host กดเริ่มรอบใหม่...
+          </p>
+        )}
+
+        {/* Error */}
+        {error && (
+          <div className="rounded-[var(--radius-md)] bg-danger/10 px-4 py-3 text-sm text-danger">
+            {error}
+          </div>
+        )}
+      </div>
+    </main>
   );
 }

@@ -8,11 +8,6 @@ import { auth, rldb } from "@/app/lib/firebase";
 import { useAuth } from "@/app/lib/useAuth";
 import { listAdmins, addAdmin, removeAdmin, AdminItem } from "@/app/lib/adminFunctions";
 
-// หน้า Admin — จัดการ admin user (เพิ่ม/ถอดสิทธิ์)
-//
-// หมายเหตุสำคัญ: ปุ่ม "ถอดสิทธิ์" จะลบ record ที่ admins/{uid} (RTDB) เท่านั้น
-// ส่วน user ใน Firebase Auth ระบบจะลบให้อัตโนมัติผ่าน trigger adminRemoved
-// (ใคร "หลุด" จาก admin -> ลบ user ใน auth ตามไปอัตโนมัติ ไม่ต้องลบมือ)
 export default function AdminUsersPage() {
   const router = useRouter();
   const { user, loading } = useAuth();
@@ -23,7 +18,6 @@ export default function AdminUsersPage() {
   const [newUid, setNewUid] = useState("");
   const [confirmRemoveUid, setConfirmRemoveUid] = useState<string | null>(null);
 
-  // gate หน้าเฉพาะ admin (เหมือนหน้าจัดการ location)
   useEffect(() => {
     if (loading) return;
     if (!user || user.isAnonymous) {
@@ -90,80 +84,142 @@ export default function AdminUsersPage() {
     });
   }
 
-  if (loading || isAdmin === null) return <div>กำลังตรวจสอบสิทธิ์...</div>;
+  if (loading || isAdmin === null) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center">
+        <p className="text-sm text-text-secondary">กำลังตรวจสอบสิทธิ์...</p>
+      </div>
+    );
+  }
 
   return (
-    <div style={{ maxWidth: 720, margin: "0 auto", padding: 24 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h1>Admin — จัดการ Admin</h1>
-        <div>
-          <Link href="/admin">Admin Home</Link>
-          {" | "}
-          <Link href="/">หน้าแรก</Link>
-          {" | "}
-          <button onClick={() => signOut(auth)}>ออกจากระบบ</button>
+    <main className="min-h-dvh bg-bg">
+      <div className="mx-auto max-w-lg px-4 py-8">
+        {/* Header */}
+        <div className="mb-6 flex items-center justify-between">
+          <h1 className="text-lg font-bold text-text">Admin Users</h1>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/admin"
+              className="text-xs text-text-muted transition-colors hover:text-text-secondary"
+            >
+              Admin
+            </Link>
+            <Link
+              href="/"
+              className="text-xs text-text-muted transition-colors hover:text-text-secondary"
+            >
+              หน้าแรก
+            </Link>
+            <button
+              onClick={() => signOut(auth)}
+              className="text-xs text-text-muted transition-colors hover:text-danger"
+            >
+              ออก
+            </button>
+          </div>
+        </div>
+
+        {error && (
+          <div className="mb-4 rounded-[var(--radius-md)] bg-danger/10 px-4 py-3 text-sm text-danger">
+            {error}
+          </div>
+        )}
+
+        {/* Add Form */}
+        <div className="mb-6 space-y-3 rounded-[var(--radius-md)] border border-border bg-surface p-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-text-muted">
+            เพิ่ม Admin ใหม่
+          </p>
+          <p className="text-xs text-text-muted">
+            ใส่ uid ของคนที่จะให้สิทธิ์ (ต้องเคย login Google ผ่าน Firebase มาก่อน)
+          </p>
+          <div className="flex gap-2">
+            <input
+              value={newUid}
+              onChange={(e) => setNewUid(e.target.value)}
+              placeholder="uid"
+              className="flex-1 rounded-[var(--radius-sm)] border border-border bg-surface px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/20"
+            />
+            <button
+              onClick={handleAdd}
+              disabled={busy || newUid.trim().length === 0}
+              className="rounded-[var(--radius-md)] bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {busy ? "..." : "เพิ่ม"}
+            </button>
+          </div>
+        </div>
+
+        {/* List */}
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-text-secondary">
+            ทั้งหมด {admins.length} admins
+          </p>
+          {admins.length === 0 && (
+            <p className="text-sm text-text-muted">ยังไม่มี admin</p>
+          )}
+          {admins.map((item) => (
+            <div
+              key={item.uid}
+              className="rounded-[var(--radius-md)] border border-border bg-surface p-4"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-sm font-medium text-text">
+                    {item.displayName || item.email || "ไม่มีชื่อ"}
+                  </span>
+                  {item.uid === user?.uid && (
+                    <span className="ml-1.5 text-[10px] text-text-muted">
+                      (คุณ)
+                    </span>
+                  )}
+                </div>
+              </div>
+              {item.email && (
+                <p className="mt-1 text-xs text-text-muted">{item.email}</p>
+              )}
+              <p className="mt-0.5 font-mono text-[10px] text-text-muted">
+                {item.uid}
+              </p>
+
+              {item.uid === user?.uid ? (
+                <p className="mt-2 text-[11px] text-text-muted">
+                  ลบตัวเองไม่ได้
+                </p>
+              ) : confirmRemoveUid === item.uid ? (
+                <div className="mt-2 flex items-center gap-2">
+                  <span className="text-[11px] text-danger">
+                    ยืนยันถอดสิทธิ์? จะลบ user ใน Auth ด้วย
+                  </span>
+                  <button
+                    onClick={() => handleRemove(item)}
+                    disabled={busy}
+                    className="rounded-[var(--radius-sm)] bg-danger px-2.5 py-1 text-[11px] font-medium text-white transition-colors hover:bg-danger-hover disabled:opacity-50"
+                  >
+                    ใช่
+                  </button>
+                  <button
+                    onClick={() => setConfirmRemoveUid(null)}
+                    disabled={busy}
+                    className="rounded-[var(--radius-sm)] border border-border px-2.5 py-1 text-[11px] font-medium text-text transition-colors hover:bg-bg-subtle disabled:opacity-50"
+                  >
+                    ยกเลิก
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setConfirmRemoveUid(item.uid)}
+                  disabled={busy}
+                  className="mt-2 rounded-[var(--radius-sm)] px-2.5 py-1 text-[11px] font-medium text-text-muted transition-colors hover:text-danger disabled:opacity-50"
+                >
+                  ถอดสิทธิ์
+                </button>
+              )}
+            </div>
+          ))}
         </div>
       </div>
-
-      {error && <p style={{ color: "red" }}>{error}</p>}
-
-      <section style={{ marginTop: 24, border: "1px solid #ccc", padding: 16 }}>
-        <h2>เพิ่ม Admin ใหม่</h2>
-        <p>
-          ใส่ uid ของคนที่จะให้สิทธิ์ - คนนั้นต้องเคย login (Google) ผ่าน Firebase มาก่อน
-          ถึงจะมี record ใน Firebase Auth
-        </p>
-        <div style={{ display: "flex", gap: 8 }}>
-          <input
-            value={newUid}
-            onChange={(e) => setNewUid(e.target.value)}
-            placeholder="uid (จาก Firebase Auth)"
-            style={{ flex: 1 }}
-          />
-          <button onClick={handleAdd} disabled={busy || newUid.trim().length === 0}>
-            {busy ? "กำลังบันทึก..." : "เพิ่ม Admin"}
-          </button>
-        </div>
-      </section>
-
-      <section style={{ marginTop: 24 }}>
-        <h2>Admin ทั้งหมด ({admins.length})</h2>
-        {admins.length === 0 && <p>ยังไม่มี admin ในระบบ</p>}
-        {admins.map((item) => (
-          <div
-            key={item.uid}
-            style={{ border: "1px solid #ccc", padding: 12, marginBottom: 12 }}
-          >
-            <div>
-              <strong>{item.displayName || item.email || "ไม่มีชื่อ"}</strong>
-              {item.uid === user?.uid && " (คุณ)"}
-            </div>
-            {item.email && <p>email: {item.email}</p>}
-            <p>uid: {item.uid}</p>
-
-            {item.uid === user?.uid ? (
-              <p style={{ color: "#888" }}>ลบตัวเองไม่ได้ (กัน lock out)</p>
-            ) : confirmRemoveUid === item.uid ? (
-              <p>
-                ยืนยันถอดสิทธิ์?{" "}
-                <span style={{ color: "red" }}>
-                  ระบบจะลบ user ใน Firebase Auth ให้อัตโนมัติ (login กลับไม่ได้อีก)
-                </span>{" "}
-                <button onClick={() => handleRemove(item)} disabled={busy}>
-                  ใช่ ถอดสิทธิ์เลย
-                </button>{" "}
-                <button onClick={() => setConfirmRemoveUid(null)} disabled={busy}>
-                  ยกเลิก
-                </button>
-              </p>
-            ) : (
-              <button onClick={() => setConfirmRemoveUid(item.uid)} disabled={busy}>
-                ถอดสิทธิ์
-              </button>
-            )}
-          </div>
-        ))}
-      </section>
-    </div>
+    </main>
   );
 }

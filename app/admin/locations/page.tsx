@@ -23,16 +23,12 @@ type LocationItem = {
   createdBy?: string;
 };
 
-// ต้องตรงกับ backend: MIN_ROLES = MAX_PLAYERS(8) - 1 = 7
-// ใช้เตือนแบบ realtime ก่อนกด submit เพื่อกันส่ง request ที่ backend จะ reject อยู่ดี
 const MIN_ROLES = 7;
 
-// แปลงรายการ roles (รวมช่องว่าง) เป็น array ที่กรอกจริงแล้ว
 function filledRoles(roles: string[]): string[] {
   return roles.map((r) => r.trim()).filter((r) => r.length > 0);
 }
 
-// ฟอร์มกรอกชื่อ + roles แบบ dynamic list (ใช้ทั้งตอนเพิ่มและแก้ไข)
 function RoleFields({
   roles,
   onChange,
@@ -42,33 +38,43 @@ function RoleFields({
 }) {
   const count = filledRoles(roles).length;
   return (
-    <div>
-      <p>
-        บทบาท ({count} / อย่างน้อย {MIN_ROLES}):
+    <div className="space-y-2">
+      <p className="text-xs text-text-secondary">
+        บทบาท ({count} / อย่างน้อย {MIN_ROLES})
       </p>
-      {roles.map((role, i) => (
-        <div key={i} style={{ display: "flex", gap: 4, marginBottom: 4 }}>
-          <input
-            value={role}
-            onChange={(e) => {
-              const next = [...roles];
-              next[i] = e.target.value;
-              onChange(next);
-            }}
-            placeholder={`บทบาทที่ ${i + 1}`}
-            style={{ flex: 1 }}
-          />
-          <button type="button" onClick={() => onChange(roles.filter((_, j) => j !== i))}>
-            ลบ
-          </button>
-        </div>
-      ))}
-      <button type="button" onClick={() => onChange([...roles, ""])}>
+      <div className="space-y-1.5">
+        {roles.map((role, i) => (
+          <div key={i} className="flex gap-1.5">
+            <input
+              value={role}
+              onChange={(e) => {
+                const next = [...roles];
+                next[i] = e.target.value;
+                onChange(next);
+              }}
+              placeholder={`บทบาทที่ ${i + 1}`}
+              className="flex-1 rounded-[var(--radius-sm)] border border-border bg-surface px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/20"
+            />
+            <button
+              type="button"
+              onClick={() => onChange(roles.filter((_, j) => j !== i))}
+              className="rounded-[var(--radius-sm)] px-2 text-xs text-text-muted transition-colors hover:text-danger"
+            >
+              x
+            </button>
+          </div>
+        ))}
+      </div>
+      <button
+        type="button"
+        onClick={() => onChange([...roles, ""])}
+        className="text-xs font-medium text-accent transition-colors hover:text-accent-hover"
+      >
         + เพิ่มบทบาท
       </button>
       {count < MIN_ROLES && (
-        <p style={{ color: "orange" }}>
-          ยังไม่ครบขั้นต่ำ {MIN_ROLES} roles (ต้องมากพอให้ผู้เล่นปกติทุกคนได้ role ไม่ซ้ำ)
+        <p className="text-xs text-warning">
+          ยังไม่ครบขั้นต่ำ {MIN_ROLES} roles
         </p>
       )}
     </div>
@@ -85,17 +91,13 @@ export default function AdminLocationsPage() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [seedMsg, setSeedMsg] = useState("");
 
-  // form เพิ่ม location ใหม่
   const [newName, setNewName] = useState("");
   const [newRoles, setNewRoles] = useState<string[]>([""]);
 
-  // form แก้ไข location
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editRoles, setEditRoles] = useState<string[]>([""]);
 
-  // 1) กันหน้าเข้าได้เฉพาะ admin จริงๆ (user ที่เป็น Google + อยู่ใน admins/{uid})
-  //    เช็คผ่าน security rules เป็นหลัก แต่หน้านี้ทำ gate ไว้ให้ user เห็น UI ก่อนใช้ callable
   useEffect(() => {
     if (loading) return;
     if (!user || user.isAnonymous) {
@@ -115,7 +117,6 @@ export default function AdminLocationsPage() {
         }
         setIsAdmin(true);
 
-        // 2) subscribe ทั้ง locations list เพื่อโชว์แบบ realtime
         unsub = onValue(
           ref(rldb, "locations"),
           (locationsSnap) => {
@@ -131,7 +132,7 @@ export default function AdminLocationsPage() {
           },
           (err) => {
             console.error("subscribe locations error:", err);
-            setError("อ่าน location ไม่สำเร็จ (เช็ค security rules)");
+            setError("อ่าน location ไม่สำเร็จ");
           }
         );
       })
@@ -163,7 +164,6 @@ export default function AdminLocationsPage() {
     const roles = filledRoles(newRoles);
     run(async () => {
       await addLocation({ name: newName.trim(), roles });
-      // reset form ให้พร้อมเพิ่มตัวถัดไป
       setNewName("");
       setNewRoles([""]);
     });
@@ -174,7 +174,6 @@ export default function AdminLocationsPage() {
   }
 
   function handleDelete(item: LocationItem) {
-    // ลบจริงแบบถาวร (แนะนำให้ปิดก่อนถ้ายังไม่แน่ใจ)
     run(async () => {
       await deleteLocation(item.id);
       setConfirmDeleteId(null);
@@ -185,7 +184,7 @@ export default function AdminLocationsPage() {
     setSeedMsg("");
     run(async () => {
       const res = await seedLocations();
-      setSeedMsg(`เพิ่ม location พื้นฐานสำเร็จ ${res.added} ตัว (ตัวที่ซ้ำกันข้ามไป)`);
+      setSeedMsg(`เพิ่ม ${res.added}  location สำเร็จ`);
     });
   }
 
@@ -212,108 +211,184 @@ export default function AdminLocationsPage() {
     );
   }
 
-  if (loading || isAdmin === null) return <div>กำลังตรวจสอบสิทธิ์...</div>;
+  if (loading || isAdmin === null) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center">
+        <p className="text-sm text-text-secondary">กำลังตรวจสอบสิทธิ์...</p>
+      </div>
+    );
+  }
 
   const addReady = newName.trim().length > 0 && filledRoles(newRoles).length >= MIN_ROLES;
 
   return (
-    <div style={{ maxWidth: 720, margin: "0 auto", padding: 24 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h1>Admin — จัดการ Location</h1>
-        <div>
-          <Link href="/">หน้าแรก</Link>
-          {" | "}
-          <button onClick={() => signOut(auth)}>ออกจากระบบ</button>
+    <main className="min-h-dvh bg-bg">
+      <div className="mx-auto max-w-lg px-4 py-8">
+        {/* Header */}
+        <div className="mb-6 flex items-center justify-between">
+          <h1 className="text-lg font-bold text-text">Locations</h1>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/"
+              className="text-xs text-text-muted transition-colors hover:text-text-secondary"
+            >
+              หน้าแรก
+            </Link>
+            <button
+              onClick={() => signOut(auth)}
+              className="text-xs text-text-muted transition-colors hover:text-danger"
+            >
+              ออก
+            </button>
+          </div>
+        </div>
+
+        {error && (
+          <div className="mb-4 rounded-[var(--radius-md)] bg-danger/10 px-4 py-3 text-sm text-danger">
+            {error}
+          </div>
+        )}
+
+        {/* Seed */}
+        <div className="mb-6 flex items-center gap-2">
+          <button
+            onClick={handleSeed}
+            disabled={busy}
+            className="rounded-[var(--radius-sm)] border border-border bg-surface px-3 py-1.5 text-xs font-medium text-text transition-colors hover:bg-bg-subtle disabled:opacity-50"
+          >
+            Seed defaults
+          </button>
+          {seedMsg && <span className="text-xs text-success">{seedMsg}</span>}
+        </div>
+
+        {/* Add Form */}
+        <div className="mb-6 space-y-3 rounded-[var(--radius-md)] border border-border bg-surface p-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-text-muted">
+            เพิ่ม Location ใหม่
+          </p>
+          <input
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder="ชื่อสถานที่ เช่น โรงพยาบาล"
+            className="w-full rounded-[var(--radius-sm)] border border-border bg-surface px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/20"
+          />
+          <RoleFields roles={newRoles} onChange={setNewRoles} />
+          <button
+            onClick={handleAdd}
+            disabled={busy || !addReady}
+            className="w-full rounded-[var(--radius-md)] bg-accent px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {busy ? "กำลังบันทึก..." : "เพิ่ม Location"}
+          </button>
+        </div>
+
+        {/* List */}
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-text-secondary">
+            ทั้งหมด {locations.length} locations
+          </p>
+          {locations.length === 0 && (
+            <p className="text-sm text-text-muted">ยังไม่มี location</p>
+          )}
+          {locations.map((item) => (
+            <div
+              key={item.id}
+              className="rounded-[var(--radius-md)] border border-border bg-surface p-4"
+            >
+              {editingId === item.id ? (
+                <div className="space-y-3">
+                  <input
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    placeholder="ชื่อสถานที่"
+                    className="w-full rounded-[var(--radius-sm)] border border-border bg-surface px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/20"
+                  />
+                  <RoleFields roles={editRoles} onChange={setEditRoles} />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleSaveEdit}
+                      disabled={busy || editName.trim().length === 0 || filledRoles(editRoles).length < MIN_ROLES}
+                      className="rounded-[var(--radius-sm)] bg-accent px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
+                    >
+                      บันทึก
+                    </button>
+                    <button
+                      onClick={cancelEdit}
+                      disabled={busy}
+                      className="rounded-[var(--radius-sm)] border border-border px-3 py-1.5 text-xs font-medium text-text transition-colors hover:bg-bg-subtle disabled:opacity-50"
+                    >
+                      ยกเลิก
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-text">
+                        {item.name}
+                      </span>
+                      <span
+                        className={`text-[10px] font-medium ${
+                          item.active ? "text-success" : "text-danger"
+                        }`}
+                      >
+                        {item.active ? "active" : "inactive"}
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-text-muted">
+                    {item.roles.length} roles: {item.roles.slice(0, 5).join(", ")}
+                    {item.roles.length > 5 ? ` +${item.roles.length - 5}` : ""}
+                  </p>
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={() => handleToggle(item)}
+                      disabled={busy}
+                      className="rounded-[var(--radius-sm)] border border-border px-2.5 py-1 text-[11px] font-medium text-text transition-colors hover:bg-bg-subtle disabled:opacity-50"
+                    >
+                      {item.active ? "ปิด" : "เปิด"}
+                    </button>
+                    <button
+                      onClick={() => startEdit(item)}
+                      disabled={busy}
+                      className="rounded-[var(--radius-sm)] border border-border px-2.5 py-1 text-[11px] font-medium text-text transition-colors hover:bg-bg-subtle disabled:opacity-50"
+                    >
+                      แก้ไข
+                    </button>
+                    {confirmDeleteId === item.id ? (
+                      <div className="flex gap-1.5">
+                        <button
+                          onClick={() => handleDelete(item)}
+                          disabled={busy}
+                          className="rounded-[var(--radius-sm)] bg-danger px-2.5 py-1 text-[11px] font-medium text-white transition-colors hover:bg-danger-hover disabled:opacity-50"
+                        >
+                          ลบเลย
+                        </button>
+                        <button
+                          onClick={() => setConfirmDeleteId(null)}
+                          disabled={busy}
+                          className="rounded-[var(--radius-sm)] border border-border px-2.5 py-1 text-[11px] font-medium text-text transition-colors hover:bg-bg-subtle disabled:opacity-50"
+                        >
+                          ยกเลิก
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmDeleteId(item.id)}
+                        disabled={busy}
+                        className="rounded-[var(--radius-sm)] px-2.5 py-1 text-[11px] font-medium text-text-muted transition-colors hover:text-danger disabled:opacity-50"
+                      >
+                        ลบ
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       </div>
-
-      {error && <p style={{ color: "red" }}>{error}</p>}
-
-      <div style={{ marginTop: 8 }}>
-        <button onClick={handleSeed} disabled={busy}>
-          Seed ข้อมูลพื้นฐาน (จากระบบเดิม)
-        </button>
-        {seedMsg && <span style={{ marginLeft: 8 }}>{seedMsg}</span>}
-      </div>
-
-      <section style={{ marginTop: 24, border: "1px solid #ccc", padding: 16 }}>
-        <h2>เพิ่ม Location ใหม่</h2>
-        <input
-          value={newName}
-          onChange={(e) => setNewName(e.target.value)}
-          placeholder="ชื่อสถานที่ เช่น โรงพยาบาล"
-          style={{ marginBottom: 8, display: "block", width: "100%" }}
-        />
-        <RoleFields roles={newRoles} onChange={setNewRoles} />
-        <button onClick={handleAdd} disabled={busy || !addReady}>
-          {busy ? "กำลังบันทึก..." : "เพิ่ม Location"}
-        </button>
-      </section>
-
-      <section style={{ marginTop: 24 }}>
-        <h2>Location ทั้งหมด ({locations.length})</h2>
-        {locations.length === 0 && <p>ยังไม่มี location ในระบบ</p>}
-        {locations.map((item) => (
-          <div
-            key={item.id}
-            style={{ border: "1px solid #ccc", padding: 12, marginBottom: 12 }}
-          >
-            {editingId === item.id ? (
-              <div>
-                <input
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  placeholder="ชื่อสถานที่"
-                  style={{ marginBottom: 8, display: "block", width: "100%" }}
-                />
-                <RoleFields roles={editRoles} onChange={setEditRoles} />
-                <button
-                  onClick={handleSaveEdit}
-                  disabled={busy || editName.trim().length === 0 || filledRoles(editRoles).length < MIN_ROLES}
-                >
-                  บันทึก
-                </button>
-                <button onClick={cancelEdit} disabled={busy}>
-                  ยกเลิก
-                </button>
-              </div>
-            ) : (
-              <div>
-                <div>
-                  <strong>{item.name}</strong>{" "}
-                  <span style={{ color: item.active ? "green" : "red" }}>
-                    {item.active ? "ใช้งานอยู่" : "ปิดอยู่"}
-                  </span>
-                </div>
-                <p>roles ({item.roles.length}): {item.roles.join(", ")}</p>
-                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                  <button onClick={() => handleToggle(item)} disabled={busy}>
-                    {item.active ? "ปิดการใช้งาน" : "เปิดการใช้งาน"}
-                  </button>
-                  <button onClick={() => startEdit(item)} disabled={busy}>
-                    แก้ไข
-                  </button>
-                  {confirmDeleteId === item.id ? (
-                    <span>
-                      ยืนยันลบถาวร?{" "}
-                      <button onClick={() => handleDelete(item)} disabled={busy}>
-                        ใช่ ลบเลย
-                      </button>{" "}
-                      <button onClick={() => setConfirmDeleteId(null)} disabled={busy}>
-                        ยกเลิก
-                      </button>
-                    </span>
-                  ) : (
-                    <button onClick={() => setConfirmDeleteId(item.id)} disabled={busy}>
-                      ลบ
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        ))}
-      </section>
-    </div>
+    </main>
   );
 }
