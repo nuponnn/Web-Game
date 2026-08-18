@@ -178,11 +178,11 @@ Output:
 - เรียกได้เฉพาะตอน `status: "lobby"`
 - ต้องมีผู้เล่นอย่างน้อย 3 คน
 - ใช้สถานที่จาก **database** (`locations` ที่ `active === true`) — ไม่ได้ใช้ static file `functions/src/data/locations.ts` แล้ว (ไฟล์นั้นเก็บไว้เป็น backup + สำหรับ migration script)
-- ใช้ `locationId` ที่ host ส่งตอน start หรือที่ตั้งไว้ตอนสร้างห้อง (`room.selectedLocationId`) -> ใช้ตัวนั้น; ไม่ระบุ -> สุ่มจาก active ทั้งหมด (ถ้าเลือกตัวที่ถูกปิด/ไม่มีอยู่ -> error ชัดเจน)
-- จำนวน spy = `spyCount` ที่ส่งตอน start -> ค่าที่ตั้งตอนสร้างห้อง (`room.spyCount`) -> default 1; ตรวจว่า 1..(จำนวนผู้เล่น - 1) (ต้องเหลือคนปกติอย่างน้อย 1 คน)
-- จำนวน joker = `jokerCount` ที่ส่งตอน start -> ค่าที่ตั้งตอนสร้างห้อง (`room.jokerCount`) -> default 0; จำกัด 0-5 คน; ตรวจว่า spy + joker < จำนวนผู้เล่น (ต้องเหลือคนปกติอย่างน้อย 1 คน)
-- ระยะเวลาหา spy = `roundDuration` ที่ส่งตอน start -> ค่าที่ตั้งตอนสร้างห้อง (`room.roundDuration`) -> default 8 นาที; จำกัดช่วง 1-15 นาที
-- ระยะเวลาโหวต = `voteDuration` ที่ส่งตอน start -> ค่าที่ตั้งตอนสร้างห้อง (`room.voteDuration`) -> default 30 วินาที; จำกัดช่วง 10-120 วินาที
+- ใช้ `locationId` ที่ host ส่งตอน start (จาก LobbyView) หรือ `room.selectedLocationId` -> ใช้ตัวนั้น; ไม่ระบุ -> สุ่มจาก active ทั้งหมด (ถ้าเลือกตัวที่ถูกปิด/ไม่มีอยู่ -> error ชัดเจน)
+- จำนวน spy = `spyCount` ที่ส่งตอน start (จาก LobbyView) -> default 1; ตรวจว่า 1..(จำนวนผู้เล่น - 1) (ต้องเหลือคนปกติอย่างน้อย 1 คน)
+- จำนวน joker = `jokerCount` ที่ส่งตอน start (จาก LobbyView) -> default 0; จำกัด 0-5 คน; ตรวจว่า spy + joker < จำนวนผู้เล่น (ต้องเหลือคนปกติอย่างน้อย 1 คน)
+- ระยะเวลาหา spy = `roundDuration` ที่ส่งตอน start (จาก LobbyView) -> default 8 นาที; จำกัดช่วง 1-15 นาที
+- ระยะเวลาโหวต = `voteDuration` ที่ส่งตอน start (จาก LobbyView) -> default 30 วินาที; จำกัดช่วง 10-120 วินาที
 - สุ่ม spy ตามจำนวนที่กำหนด (ไม่ซ้ำกัน) -> สุ่ม joker จากคนที่ไม่ใช่ spy (ไม่ซ้ำกัน) -> แจก role ให้คนที่ไม่ใช่ทั้งคู่
 - ตั้ง `status: "playing"`
 - ตั้ง `round.startedAt`, `round.duration` (จาก roundDuration), `round.endsAt`
@@ -468,14 +468,23 @@ script ย้ายข้อมูลเก่า: `functions/scripts/migrateLoc
 
 Root layout ของ Next.js:
 - ครอบ children ด้วย `AuthProvider` (จาก `useAuth.tsx`)
-- metadata ยังเป็น "Create Next App" (ยังไม่ได้แก้)
+- ใช้ Inter font (จาก next/font/google)
+- metadata: title "Spyfall", description "Find the spy among you"
+- ใช้ Tailwind CSS v4 พร้อม custom theme tokens ใน `globals.css`
+
+### `app/globals.css`
+
+Tailwind CSS v4 config แบบ CSS-first:
+- `@theme` tokens: bg (#FAFAFA), surface (#FFFFFF), accent (Indigo #4F46E5), text (#111827), danger, success, warning
+- Radius tokens: sm (8px), md (12px), lg (16px)
+- CSS animations: spotlight-in, spotlight-out, settle-in (สำหรับ Reveal)
+- `prefers-reduced-motion` support
 
 ### `app/lib/firebase.js`
 
 Firebase singleton init:
 - สร้าง Firebase app, auth, rldb, functions instances
 - ถ้ารันบน localhost จะ auto-connect emulators อัตโนมัติ
-- แสดง `alert("⚡ Connected to Firebase Emulator Suite")` เมื่อเชื่อม emulator (debug leftover)
 
 ### `app/lib/useAuth.tsx`
 
@@ -494,73 +503,122 @@ Client wrappers สำหรับ game callables ทั้งหมด:
 Client wrappers สำหรับ admin callables:
 - `listAdmins`, `addAdmin`, `removeAdmin`, `addLocation`, `updateLocation`, `toggleLocationActive`, `deleteLocation`, `seedLocations`
 
-### `app/page.tsx`
+### `app/page.tsx` (Home)
 
-เป็นหน้า Home:
+Flow ใหม่ — ชื่อก่อน แล้วเลือก Create/Join:
 
-- เป็น client component ฟัง auth ผ่าน `useAuth()`
-- มีช่องกรอกชื่อ + ปุ่ม **Create Room** (call `createRoom`) และปุ่ม **Join Room** (กรอก roomId + call `joinRoom`)
-- **admin** ที่ login Google ไว้ จะเห็น select **สถานที่** (จาก locations ที่ active) + select **จำนวน Spy** เพิ่ม -> ส่งไปตอน `createRoom` (เลือกสถานที่/กำหนด spy ตอนสร้างห้องได้เอง); ผู้เล่นธรรมดาไม่เห็น -> สร้างห้องแบบสุ่ม
-- **host ทุกคน** เห็น select **จำนวน Joker** (0-5 คน) + select **เวลาหา Spy** (1-15 นาที) + select **เวลาโหวต** (10-120 วินาที) -> ส่งไปตอน `createRoom` (Joker select ไม่ได้จำกัดเฉพาะ admin)
-- สำเร็จแล้ว `router.push` ไป `/room/{roomId}`
-- มีลิงก์ **Admin** ไป `/admin`
+1. แสดงช่องกรอกชื่อ (name)
+2. แสดง 2 ปุ่ม: "สร้างห้อง" และ "เข้าร่วมห้อง"
+3. กด "สร้างห้อง" → call `createRoom({ name })` → navigate ไป `/room/{roomId}`
+4. กด "เข้าร่วมห้อง" → แสดงช่องกรอกรหัสห้อง (roomId) + ปุ่ม "เข้าร่วม" + ปุ่ม "กลับ"
+   - กด "เข้าร่วม" → call `joinRoom({ roomId, name })` → navigate ไป `/room/{roomId}`
+5. มีลิงก์ **Admin** ไป `/admin` ที่ด้านล่าง
+
+ไม่มี game settings บนหน้านี้อีกแล้ว (ย้ายไป Lobby)
 
 ### `app/admin/page.tsx` / `app/admin/locations/page.tsx` / `app/admin/users/page.tsx`
 
-ระบบจัดการฝั่ง admin:
-
-- `/admin` — admin login แยกจากผู้เล่น: ผู้เล่นทั่วไปเป็น anonymous แต่ admin ต้อง **Google Sign-In** แล้วระบบจะ**สมัครสิทธิ์ admin ให้เองทันที** (เขียน `admins/{uid}` ของตัวเอง) ไม่ต้องขออนุญาต/ไม่ต้องเพิ่มจาก Console; ถ้าเป็น admin -> เห็น hub ลิงก์ไปจัดการ Location และจัดการ Admin
-- `/admin/locations` — กันเฉพาะ admin: ฟอร์มเพิ่ม location (ชื่อ + roles dynamic list พร้อม warning realtime เมื่อ roles ยังไม่ครบขั้นต่ำ), ลิสต์ location ทั้งหมด, ปุ่มเปิด/ปิด (toggle), แก้ไข, ลบถาวร (ยืนยันก่อน), และปุ่ม **Seed ข้อมูลพื้นฐาน**
-- `/admin/users` — กันเฉพาะ admin: ลิสต์ admin ทั้งหมด, เพิ่ม admin (กรอก uid), ถอดสิทธิ์ (ลบ record ใน RTDB แล้วระบบลบ user ใน Auth ให้อัตโนมัติ พร้อมยืนยันก่อนลบ)
+ระบบจัดการฝั่ง admin (ใช้ Tailwind styling):
+- `/admin` — admin login แยกจากผู้เล่น: ผู้เล่นทั่วไปเป็น anonymous แต่ admin ต้อง **Google Sign-In** แล้วระบบจะ**สมัครสิทธิ์ admin ให้เองทันที**; ถ้าเป็น admin -> เห็น hub ลิงก์ไปจัดการ Location และจัดการ Admin
+- `/admin/locations` — กันเฉพาะ admin: ฟอร์มเพิ่ม location (ชื่อ + roles dynamic list), ลิสต์ location ทั้งหมดแบบ card layout, ปุ่มเปิด/ปิด, แก้ไข, ลบถาวร (ยืนยันก่อน), ปุ่ม Seed ข้อมูลพื้นฐาน
+- `/admin/users` — กันเฉพาะ admin: ลิสต์ admin ทั้งหมดแบบ card layout, เพิ่ม admin (กรอก uid), ถอดสิทธิ์ (ยืนยันก่อนลบ)
 - wrapper callable อยู่ที่ `app/lib/adminFunctions.ts`
 
 ### `app/room/[roomId]/page.tsx`
 
 เป็นหน้าหลักของเกม:
-
 - `useRoom(roomId, user?.uid)` subscribe `rooms/{roomId}` (public) + `roomPrivate/{roomId}/{uid}` (ของตัวเอง) แล้ว merge ให้ View ใช้เหมือนเดิม
 - `useAuth()` หา uid ปัจจุบัน
 - `usePresence(roomId, uid, !!room)` แจ้งออนไลน์ (จุดชนวนลบห้องอัตโนมัติ)
 - render ตาม `room.status`: `LobbyView` / `PlayingView` / `VotingView` / `RevealView`
-- ถ้า `room` เป็น null (ห้องถูกลบไปแล้ว / roomId ผิด) -> แสดง "ไม่พบห้องนี้" + ปุ่ม **กลับหน้าแรก** (`router.push("/")`)
-- ถ้าผู้เล่นถูกเตะ (ไม่อยู่ใน `players` แล้ว) -> redirect กลับหน้าแรกผ่าน `useEffect` (ไม่ใช่ระหว่าง render)
+- ถ้า `room` เป็น null -> แสดง "ไม่พบห้องนี้" + ปุ่ม **กลับหน้าแรก**
+- ถ้าผู้เล่นถูกเตะ -> redirect กลับหน้าแรกผ่าน `useEffect`
+
+### `app/room/[roomId]/LobbyView.tsx`
+
+แสดงในหน้า lobby (ใช้ Tailwind styling):
+- แสดงรหัสห้อง (roomId) ที่ด้านบน
+- **รายชื่อผู้เล่น** พร้อม online/offline indicator (จุดสีเขียว=online, สีเทา=offline)
+  - แต่ละคนแสดง: ชื่อ, host badge (ถ้าเป็น host), "(คุณ)" (ถ้าเป็นตัวเอง)
+  - Host เห็นปุ่ม "x" สำหรับเตะผู้เล่นคนอื่น
+- **Location Info** (ถ้าเลือก location ไว้) — แสดงชื่อสถานที่ + roles ทั้งหมด
+- **Host Settings** — ปุ่ม "ตั้งค่าเกม" สำหรับ host เท่านั้น:
+  - Location select (admin host เท่านั้น)
+  - Spy count (1-7)
+  - Joker count (0-5)
+  - Spy time (1-15 นาที)
+  - Vote time (10-120 วินาที)
+- **ปุ่ม Start Game** (host) — ต้องมีอย่างน้อย 3 คน
+- **รอ host** (คนอื่น) — แสดง loading dots
+
+### `app/room/[roomId]/PlayingView.tsx`
+
+แสดงในหน้า playing (ใช้ Tailwind styling):
+- **Countdown** — แสดงเวลาถอยหลัง (Countdown component)
+- **Role Card** ตามสถานะ:
+  - Spy: icon 🕵️ + "คุณคือ Spy" + คำอธิบาย
+  - Joker: icon 🃏 + "คุณคือ Joker" + แสดง location
+  - Townsfolk: icon 👤 + "คุณคือคนท้องถิ่น" + แสดง location + role
+- **Host End Button** — ปุ่ม "จบ Round" สำหรับ host
+
+### `app/room/[roomId]/VotingView.tsx`
+
+แสดงในหน้า voting (ใช้ Tailwind styling):
+- **หัวข้อ** "ใครคือ Spy?"
+- **Countdown** — แสดงเวลาถอยหลังโหวต
+- **Vote count** — "โหวตแล้ว X / Y"
+- **รายชื่อผู้เล่น** แต่ละคนมี:
+  - ชื่อ + "(คุณ)" + "host" badge
+  - ปุ่ม "โหวต" / "เปลี่ยน" (เมื่อเลือกแล้ว) — เลือกแล้วจะมี border สี accent
+  - Online indicator (จุดสีเขียว/เทา)
+- **ปุ่ม "ไม่โหวต"** (skip) — เมื่อเลือกแล้วจะมี border สี accent
+
+### `app/room/[roomId]/RevealView.tsx`
+
+แสดงในหน้า reveal — มี **animated spotlight reveal** (ใช้ Tailwind + CSS animations):
+
+**Sequence:**
+1. **0-2.5s**: ผลโหวต — แสดงใหญ่กลางจอ (ใครโดนโหวตออก)
+2. **2.5-5s**: สถานที่ — แสดงใหญ่กลางจอ
+3. **5-7.5s**: Spy — แสดงใหญ่กลางจอ + icon 🕵️
+4. **7.5-10s**: Joker (ถ้ามี) — แสดงใหญ่กลางจอ + icon 🃏
+5. **10-12s**: ผู้ชนะ — pop ขึ้นมา + pulse glow
+6. **12s+**: ปุ่ม "เล่นรอบใหม่" + "กลับหน้าแรก" (host) / รอ host (คนอื่น)
+
+**Effect:**
+- Spotlight card ขยายใหญ่กลางจอ + blur → focus
+- พอหมดเวลา → fade out เล็กลง
+- Card เล็กๆ ปรากฏ list ด้านบน (สะสมไปเรื่อยๆ)
+- รองรับ `prefers-reduced-motion`
 
 ### `app/components/Countdown.tsx`
 
-หน้าที่:
-
-- รับ `endsAt`
+Reusable countdown timer:
+- รับ `endsAt` (timestamp)
 - ใช้ `useServerTimeOffset()` เพื่อเทียบเวลา client กับ Firebase server
-- แสดงเวลาถอยหลัง
+- แสดงเวลาถอยหลัง (format: M:SS)
 - เรียก `onExpire()` หนึ่งครั้งเมื่อหมดเวลา
-
-ควรใช้ตอน `status: "playing"` แล้วให้ `onExpire` เรียก `endRound({ roomId, reason: "timeout" })`
+- แสดง "หมดเวลา!" สีแดงเมื่อ expire
 
 ### `app/lib/useRoom.ts`
 
-หน้าที่:
-
-- subscribe Realtime Database ที่ `rooms/{roomId}` (public) + `roomPrivate/{roomId}/{uid}` (ของตัวเอง)
-- คืน `{ room, loading }` โดย `room` type เป็น `Room | null` (ประกาศเองในไฟล์นี้ให้ตรงกับ backend) — ตอนเช็ค `!room` แล้ว TS จะได้ type เป็น `Room` ไม่ติด `never`
-- merge ข้อมูลลับของตัวเองเข้า `room` ก่อนคืน: `players[uid].isSpy/isJoker/role` + `room.location` (ระหว่างเล่น = จาก private; ตอน reveal = ค่า public ที่ resolveVote เขียนให้ทุกคนเห็น)
-- `loading` จะเป็น `true` จนกว่าจะได้ทั้ง public room และ private ของตัวเอง (กัน flash เห็นข้อมูลผิดตอนสลับ View)
+ subscribe Realtime Database:
+- คืน `{ room, loading }` โดย `room` type เป็น `Room | null`
+- merge ข้อมูลลับของตัวเองเข้า `room`: `players[uid].isSpy/isJoker/role` + `room.location`
+- `loading` จะเป็น `true` จนกว่าจะได้ทั้ง public room และ private
 
 ### `app/lib/usePresence.ts`
 
-หน้าที่:
-
+ระบบ online/offline:
 - ตอนเข้า room page เขียน `presence/{roomId}/{uid} = true`
-- สั่ง `onDisconnect().remove()` เพื่อให้ server ลบ presence อัตโนมัติเมื่อ client หลุดการเชื่อมต่อ
-- ตอน unmount ยกเลิก onDisconnect + ลบ presence ออก (เปลี่ยนหน้าแล้วไม่นับว่าอยู่ห้อง)
-- เรียกใน `app/room/[roomId]/page.tsx` โดยเปิดทำงานเฉพาะเมื่อมี `room` + `user` แล้ว
-- เป็นตัวจุดชนวนให้ backend ลบห้องทันทีเมื่อ host หลุด หรือไม่มีใครออนไลน์เหลือ
+- สั่ง `onDisconnect().remove()` เพื่อให้ server ลบ presence อัตโนมัติ
+- ตอน unmount ยกเลิก onDisconnect + ลบ presence
 
 ### `app/lib/useServerTime.ts`
 
-หน้าที่:
-
+เวลา server:
 - อ่าน `.info/serverTimeOffset`
-- คืน offset สำหรับคำนวณ server time โดยประมาณ
+- คืน offset สำหรับคำนวณ server time
 
 ## Flow หน้าจอที่ควรมี
 

@@ -18,6 +18,7 @@ export default function Home() {
     if (mode === "create" && name.trim().length > 0 && !creating) {
       handleCreate();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
   if (loading) {
