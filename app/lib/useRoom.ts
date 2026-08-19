@@ -25,7 +25,7 @@ export type Room = {
     string,
     { name: string; online: boolean; isSpy?: boolean; isJoker?: boolean; role?: string; joinedAt: number }
   >;
-  round?: { startedAt: number; duration: number; endsAt: number; voteEndsAt?: number };
+  round?: { roundId?: string; startedAt: number; duration: number; endsAt: number; voteEndsAt?: number };
   // voterUid -> { targetUid, votedAt } (targetUid = null หมายถึง skip)
   votes?: Record<string, { targetUid: string | null; votedAt: number }>;
   result?: { winner: "players" | "spy" | "joker"; spyUids: string[]; jokerUids: string[]; votedOutUid: string | null };
@@ -33,6 +33,7 @@ export type Room = {
 
 // ข้อมูลลับของเรา (จาก roomPrivate/{roomId}/{uid}) — merge เข้า room.players[uid] + room.location
 export type MyPrivateData = {
+  roundId?: string;
   isSpy?: boolean;
   isJoker?: boolean;
   role?: string;
@@ -40,70 +41,86 @@ export type MyPrivateData = {
 };
 
 export function useRoom(roomId: string | null, uid?: string | null) {
-  const [room, setRoom] = useState<Room | null>(null);
-  const [myPrivate, setMyPrivate] = useState<MyPrivateData | null>(null);
-  const [roomLoaded, setRoomLoaded] = useState(false);
-  const [privLoaded, setPrivLoaded] = useState(false);
+  const [roomState, setRoomState] = useState<{
+    key: string | null;
+    loaded: boolean;
+    value: Room | null;
+  }>({ key: null, loaded: false, value: null });
+  const [privateState, setPrivateState] = useState<{
+    key: string | null;
+    loaded: boolean;
+    value: MyPrivateData | null;
+  }>({ key: null, loaded: false, value: null });
 
   useEffect(() => {
     if (!roomId) return;
     let cancelled = false;
     const db = getDatabase();
 
-    // reset state ตอนเปลี่ยนห้อง/user กันข้อมูลเก่าค้าง
-    setRoom(null);
-    setMyPrivate(null);
-    setRoomLoaded(false);
-    setPrivLoaded(false);
-
     const roomRef = ref(db, `rooms/${roomId}`);
     const unsubRoom = onValue(
       roomRef,
       (snap) => {
         if (cancelled) return;
-        setRoom(snap.val() as Room | null);
-        setRoomLoaded(true);
+        setRoomState({ key: roomId, loaded: true, value: snap.val() as Room | null });
       },
       (error) => {
         // จะเจอ error ตรงนี้ถ้า security rules ปฏิเสธการอ่าน - ปกติของระบบ
         console.error("useRoom error:", error);
-        setRoomLoaded(true);
+        setRoomState({ key: roomId, loaded: true, value: null });
       }
     );
-
-    let unsubPriv: (() => void) | null = null;
-    if (uid) {
-      const privRef = ref(db, `roomPrivate/${roomId}/${uid}`);
-      unsubPriv = onValue(
-        privRef,
-        (snap) => {
-          if (cancelled) return;
-          setMyPrivate(snap.val() as MyPrivateData | null);
-          setPrivLoaded(true);
-        },
-        (error) => {
-          if (cancelled) return;
-          console.error("useRoom private error:", error);
-          setPrivLoaded(true);
-        }
-      );
-    } else {
-      // ยังไม่มี uid (auth กำลังโหลด) -> ถือว่า private ว่างไว้ก่อน
-      setPrivLoaded(true);
-    }
 
     return () => {
       cancelled = true;
       unsubRoom();
-      unsubPriv?.();
+    };
+  }, [roomId]);
+
+  useEffect(() => {
+    if (!roomId || !uid) return;
+    let cancelled = false;
+    const db = getDatabase();
+    const privateKey = `${roomId}:${uid}`;
+    const privRef = ref(db, `roomPrivate/${roomId}/${uid}`);
+
+    const unsubPriv = onValue(
+      privRef,
+      (snap) => {
+        if (cancelled) return;
+        setPrivateState({
+          key: privateKey,
+          loaded: true,
+          value: snap.val() as MyPrivateData | null,
+        });
+      },
+      (error) => {
+        if (cancelled) return;
+        console.error("useRoom private error:", error);
+        setPrivateState({ key: privateKey, loaded: true, value: null });
+      }
+    );
+
+    return () => {
+      cancelled = true;
+      unsubPriv();
     };
   }, [roomId, uid]);
+
+  const roomLoaded = !!roomId && roomState.key === roomId && roomState.loaded;
+  const room = roomLoaded ? roomState.value : null;
+  const privateKey = roomId && uid ? `${roomId}:${uid}` : null;
+  const privLoaded = !uid || (privateState.key === privateKey && privateState.loaded);
+  const myPrivate = privLoaded && privateState.key === privateKey ? privateState.value : null;
+  const privateMatchesRound =
+    !!myPrivate &&
+    (!room?.round?.roundId || !myPrivate.roundId || myPrivate.roundId === room.round.roundId);
 
   // merge ข้อมูลลับของเราลงใน room: players[uid] ได้ isSpy/isJoker/role,
   // room.location ได้ค่าจาก private (ระหว่างเล่น) หรือค่าสาธารณะ (ตอน reveal)
   const mergedRoom = useMemo<Room | null>(() => {
     if (!room) return null;
-    if (!uid || !myPrivate) return room;
+    if (!uid || !myPrivate || !privateMatchesRound) return room;
 
     const players = { ...room.players };
     if (players[uid]) {
@@ -121,7 +138,10 @@ export function useRoom(roomId: string | null, uid?: string | null) {
       location: room.location ?? myPrivate.location ?? undefined,
       players,
     };
-  }, [room, myPrivate, uid]);
+  }, [room, myPrivate, privateMatchesRound, uid]);
 
-  return { room: mergedRoom, loading: !roomLoaded || !privLoaded };
+  const needsPrivateRole =
+    room?.status === "playing" && !!uid && !!room.players?.[uid] && !privateMatchesRound;
+
+  return { room: mergedRoom, loading: !roomLoaded || !privLoaded || needsPrivateRole };
 }

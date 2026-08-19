@@ -25,7 +25,10 @@ export default function LobbyView({
   const [selectedLocationId, setSelectedLocationId] = useState(
     room.selectedLocationId ?? ""
   );
-  const [locationInfo, setLocationInfo] = useState<LocationInfo | null>(null);
+  const [locationInfoState, setLocationInfoState] = useState<{
+    key: string;
+    value: LocationInfo | null;
+  } | null>(null);
   const [spyCount, setSpyCount] = useState(room.spyCount ?? 1);
   const [jokerCount, setJokerCount] = useState(room.jokerCount ?? 0);
   const [roundDurationMin, setRoundDurationMin] = useState(
@@ -43,6 +46,10 @@ export default function LobbyView({
   const effectiveLocationId = isHost
     ? selectedLocationId
     : room.selectedLocationId ?? "";
+  const locationInfo =
+    effectiveLocationId && locationInfoState?.key === effectiveLocationId
+      ? locationInfoState.value
+      : null;
 
   useEffect(() => {
     if (!isHost || !user || user.isAnonymous) return;
@@ -88,17 +95,14 @@ export default function LobbyView({
   }, [isHost, user]);
 
   useEffect(() => {
-    if (!effectiveLocationId) {
-      setLocationInfo(null);
-      return;
-    }
+    if (!effectiveLocationId) return;
     let cancelled = false;
     const unsub = onValue(
       ref(rldb, `locations/${effectiveLocationId}`),
       (snap) => {
         if (cancelled) return;
         const val = snap.val() as LocationInfo | null;
-        setLocationInfo(val ?? null);
+        setLocationInfoState({ key: effectiveLocationId, value: val ?? null });
       }
     );
     return () => {
@@ -220,7 +224,7 @@ export default function LobbyView({
           </div>
         )}
 
-        {selectedLocationId && locationInfo === null && (
+        {effectiveLocationId && locationInfo === null && (
           <p className="text-center text-xs text-text-muted">
             กำลังโหลดข้อมูลสถานที่...
           </p>

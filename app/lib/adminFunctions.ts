@@ -1,15 +1,26 @@
-import { httpsCallable } from "firebase/functions";
-import { functions } from "./firebase";
+import { auth } from "./firebase";
 
-// client wrapper สำหรับ function ฝั่ง admin
-// backend จะเช็คสิทธิ์ admin (admins/{uid}) เองเสมอ ไม่เชื่อ client
+async function apiCall<T>(path: string, body: Record<string, unknown>): Promise<T> {
+  const token = await auth.currentUser?.getIdToken();
+  const res = await fetch(path, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data?.error?.message ?? `API error ${res.status}`);
+  }
+  return data as T;
+}
 
 // ---------- Location ----------
 
 export async function addLocation(input: { name: string; roles: string[] }) {
-  const fn = httpsCallable(functions, "addLocation");
-  const res = await fn(input);
-  return res.data as { ok: true; locationId: string };
+  return apiCall<{ ok: true; locationId: string }>("/api/locations/addLocation", input);
 }
 
 export async function updateLocation(input: {
@@ -17,29 +28,19 @@ export async function updateLocation(input: {
   name: string;
   roles: string[];
 }) {
-  const fn = httpsCallable(functions, "updateLocation");
-  const res = await fn(input);
-  return res.data as { ok: true };
+  return apiCall<{ ok: true }>("/api/locations/updateLocation", input);
 }
 
 export async function toggleLocationActive(locationId: string) {
-  const fn = httpsCallable(functions, "toggleLocationActive");
-  const res = await fn({ locationId });
-  return res.data as { ok: true; active: boolean };
+  return apiCall<{ ok: true; active: boolean }>("/api/locations/toggleLocationActive", { locationId });
 }
 
-// ลบ location แบบถาวร (ระวัง: ใช้เมื่อแน่ใจว่าไม่มีห้องไหนอ้างอิงอยู่)
 export async function deleteLocation(locationId: string) {
-  const fn = httpsCallable(functions, "deleteLocation");
-  const res = await fn({ locationId });
-  return res.data as { ok: true };
+  return apiCall<{ ok: true }>("/api/locations/deleteLocation", { locationId });
 }
 
-// เติม location พื้นฐานจากระบบเก่า (ข้ามตัวที่ชื่อซ้ำ)
 export async function seedLocations() {
-  const fn = httpsCallable(functions, "seedLocations");
-  const res = await fn({});
-  return res.data as { ok: true; added: number };
+  return apiCall<{ ok: true; added: number }>("/api/locations/seedLocations", {});
 }
 
 // ---------- Admin user ----------
@@ -53,20 +54,13 @@ export type AdminItem = {
 };
 
 export async function listAdmins() {
-  const fn = httpsCallable(functions, "listAdmins");
-  const res = await fn({});
-  return res.data as { admins: AdminItem[] };
+  return apiCall<{ admins: AdminItem[] }>("/api/admins/listAdmins", {});
 }
 
 export async function addAdmin(uid: string) {
-  const fn = httpsCallable(functions, "addAdmin");
-  const res = await fn({ uid });
-  return res.data as { ok: true };
+  return apiCall<{ ok: true }>("/api/admins/addAdmin", { uid });
 }
 
-// ถอดสิทธิ์ admin + ลบ user ใน Firebase Auth ด้วย
 export async function removeAdmin(uid: string) {
-  const fn = httpsCallable(functions, "removeAdmin");
-  const res = await fn({ uid });
-  return res.data as { ok: true };
+  return apiCall<{ ok: true }>("/api/admins/removeAdmin", { uid });
 }

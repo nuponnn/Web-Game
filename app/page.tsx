@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createRoom, joinRoom } from "./lib/gameFunction";
 import { useAuth } from "./lib/useAuth";
@@ -7,27 +7,12 @@ import Link from "next/link";
 
 export default function Home() {
   const router = useRouter();
-  const { user, loading } = useAuth();
+  const { loading } = useAuth();
   const [name, setName] = useState("");
   const [mode, setMode] = useState<"idle" | "create" | "join">("idle");
   const [roomId, setRoomId] = useState("");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    if (mode === "create" && name.trim().length > 0 && !creating) {
-      handleCreate();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode]);
-
-  if (loading) {
-    return (
-      <div className="flex min-h-dvh items-center justify-center">
-        <p className="text-sm text-text-secondary">กำลังเข้าสู่ระบบ...</p>
-      </div>
-    );
-  }
 
   async function handleCreate() {
     setCreating(true);
@@ -50,6 +35,15 @@ export default function Home() {
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "เข้าร่วมห้องไม่สำเร็จ");
     }
+  }
+
+
+  if (loading) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center">
+        <p className="text-sm text-text-secondary">กำลังเข้าสู่ระบบ...</p>
+      </div>
+    );
   }
 
   return (
@@ -88,8 +82,9 @@ export default function Home() {
           <div className="space-y-3">
             <button
               onClick={() => {
-                if (name.trim().length === 0) return;
+                if (name.trim().length === 0 || creating) return;
                 setMode("create");
+                handleCreate();
               }}
               disabled={name.trim().length === 0}
               className="w-full rounded-[var(--radius-md)] bg-accent px-4 py-3.5 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
