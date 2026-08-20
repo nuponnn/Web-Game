@@ -7,7 +7,7 @@
 - Frontend: Next.js app ใน `app/`
 - Backend: Next.js Route Handlers ใน `app/api/**/route.ts`
 - Database: Firebase Realtime Database
-- Auth: ผู้เล่นใช้ anonymous auth, admin ใช้ Google sign-in
+- Auth: ผู้เล่นใช้ anonymous auth แบบ browser session/tab persistence, admin ใช้ Google sign-in
 - Secrets: API ที่เป็น cron ต้องส่ง `X-CRON-SECRET` ตรงกับ `CRON_SECRET`
 
 Route Handlers ใช้ Web `Request`/`Response` API ตาม Next.js 16 และทุก mutating endpoint เป็น `POST` โดย client wrapper อยู่ที่:
@@ -122,6 +122,7 @@ Winner logic:
   - auth required
   - input: `{ roomId, name }`
   - เข้าห้องได้เฉพาะ `status = lobby`, ห้ามชื่อซ้ำ, จำกัด 8 คน
+  - ถ้า uid เดิมอยู่ในห้องแล้ว จะ mark online และคืน `{ ok: true }` โดยไม่เขียนทับ `players/{uid}` เพื่อกันชื่อ/host เดิมหายจากการ join ซ้ำ
 
 - `POST /api/rooms/leaveRoom`
   - auth required
@@ -202,6 +203,7 @@ Winner logic:
 ### `app/page.tsx`
 
 - anonymous auth ผ่าน `AuthProvider`
+- anonymous auth ใช้ browser session/tab persistence เพื่อให้การทดสอบหลาย tab หรือหลาย session ไม่แชร์ uid เดียวจนเขียนทับ player เดิม
 - ผู้เล่นกรอกชื่อก่อน
 - กดสร้างห้อง -> `createRoom(name)` -> `/room/{roomId}`
 - กดเข้าร่วมห้อง -> กรอกรหัส -> `joinRoom(roomId, name)` -> `/room/{roomId}`

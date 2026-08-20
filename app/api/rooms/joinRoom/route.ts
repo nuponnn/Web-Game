@@ -20,6 +20,11 @@ export async function POST(req: NextRequest) {
     const room = await getRoomOrThrow(roomId);
     assertStatus(room, "lobby");
 
+    if (room.players?.[uid]) {
+      await adminDb.ref(`rooms/${roomId}/players/${uid}/online`).set(true);
+      return Response.json({ ok: true });
+    }
+
     const currentPlayers = room.players ? Object.values(room.players) : [];
     if (currentPlayers.length >= MAX_PLAYERS) {
       throw new ApiError("resource-exhausted", "ห้องเต็มแล้ว");

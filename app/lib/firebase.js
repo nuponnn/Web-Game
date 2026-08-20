@@ -1,7 +1,12 @@
 "use client";
 
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth, connectAuthEmulator } from "firebase/auth";
+import {
+  browserSessionPersistence,
+  connectAuthEmulator,
+  getAuth,
+  initializeAuth,
+} from "firebase/auth";
 import { getDatabase, connectDatabaseEmulator } from "firebase/database";
 import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
 
@@ -18,7 +23,20 @@ const firebaseConfig = {
 
 // Singleton pattern ป้องกันการรัน initializeApp ซ้ำ
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-const auth = getAuth(app);
+/** @type {import("firebase/auth").Auth} */
+let auth;
+
+if (typeof window !== "undefined") {
+  try {
+    auth = initializeAuth(app, {
+      persistence: browserSessionPersistence,
+    });
+  } catch {
+    auth = getAuth(app);
+  }
+} else {
+  auth = getAuth(app);
+}
 
 const rldb = getDatabase(app);
 
