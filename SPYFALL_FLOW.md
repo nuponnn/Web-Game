@@ -7,7 +7,7 @@
 - Frontend: Next.js app ใน `app/`
 - Backend: Next.js Route Handlers ใน `app/api/**/route.ts`
 - Database: Firebase Realtime Database
-- Auth: ผู้เล่นใช้ anonymous auth แบบ browser session/tab persistence, admin ใช้ Google sign-in
+- Auth: ผู้เล่นใช้ anonymous auth แบบ browser session/tab persistence, admin ใช้ Google sign-in และต้องมี record ใน `admins/{uid}` อยู่ก่อน
 - Secrets: API ที่เป็น cron ต้องส่ง `X-CRON-SECRET` ตรงกับ `CRON_SECRET`
 
 Route Handlers ใช้ Web `Request`/`Response` API ตาม Next.js 16 และทุก mutating endpoint เป็น `POST` โดย client wrapper อยู่ที่:
@@ -176,7 +176,8 @@ Winner logic:
 - `POST /api/locations/deleteLocation`
 - `POST /api/locations/seedLocations`
 
-ทุก endpoint ต้องเป็น admin และ validate ผ่าน `cleanAndValidateLocation()` ยกเว้น toggle/delete/seed ที่มี validation เฉพาะของตัวเอง
+ทุก endpoint ต้องเป็น admin และ validate ผ่าน `cleanAndValidateLocation()` ยกเว้น toggle/delete ที่มี validation เฉพาะของตัวเอง
+`seedLocations` เติม default locations จาก `app/lib/server/data/locations.ts` จำนวน 20 รายการแบบไม่เขียนชื่อซ้ำ และเขียนลง RTDB ด้วย multi-path update เดียว
 
 ### Admins
 
@@ -185,6 +186,7 @@ Winner logic:
 - `POST /api/admins/removeAdmin`
 
 `removeAdmin` ลบ record ใน RTDB และลบ Firebase Auth user ใน route เดียวกัน ไม่ใช้ Database Trigger แล้ว
+Client SDK อ่าน `admins` ได้เพื่อเช็กหน้า admin แต่เขียนไม่ได้ การเพิ่ม/ลบ admin ต้องทำผ่าน server endpoint หรือ Firebase Console เพื่อกัน user สมัครตัวเองเป็น admin
 
 ### Cleanup
 
@@ -253,5 +255,6 @@ Winner logic:
 
 - ต้องตั้ง `FIREBASE_SERVICE_ACCOUNT_KEY` และ `NEXT_PUBLIC_FIREBASE_DATABASE_URL` บน production
 - ต้องตั้ง `CRON_SECRET` สำหรับ cleanup endpoints
+- ต้องสร้าง admin คนแรกใน `admins/{uid}` ผ่าน Firebase Console หรือ trusted server script ก่อนใช้งานหน้า admin
 - Local emulator ใช้ `FIREBASE_DATABASE_EMULATOR_HOST` และ `FIREBASE_AUTH_EMULATOR_HOST`
 - Next.js 16 ใช้ Turbopack เป็น default; ถ้า build เตือน root เพราะมี lockfile นอก repo ให้ตั้ง `turbopack.root` ใน `next.config.ts` หรือจัด workspace root ให้ชัดเจน

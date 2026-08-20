@@ -161,7 +161,8 @@ export async function POST(req: NextRequest) {
       updates[`rooms/${roomId}/players/${id}/role`] = null;
     });
 
-    const { ServerValue } = await import("firebase-admin/database");
+    const startedAt = Date.now();
+    const endsAt = startedAt + roundDurationMs;
 
     updates[`rooms/${roomId}/location`] = null;
     updates[`rooms/${roomId}/locationId`] = location.id;
@@ -171,21 +172,14 @@ export async function POST(req: NextRequest) {
     updates[`rooms/${roomId}/result`] = null;
     updates[`rooms/${roomId}/round/roundId`] = roundId;
     updates[`rooms/${roomId}/round/duration`] = roundDurationMs;
-    updates[`rooms/${roomId}/round/startedAt`] = ServerValue.TIMESTAMP;
+    updates[`rooms/${roomId}/round/startedAt`] = startedAt;
+    updates[`rooms/${roomId}/round/endsAt`] = endsAt;
     updates[`rooms/${roomId}/spyCount`] = requestedSpyCount;
     updates[`rooms/${roomId}/roundDuration`] = roundDurationMs;
     updates[`rooms/${roomId}/voteDuration`] = voteDurationMs;
     updates[`rooms/${roomId}/jokerCount`] = requestedJokerCount;
 
     await adminDb.ref().update({ ...updates, ...privateUpdates });
-
-    const startedAtSnap = await adminDb
-      .ref(`rooms/${roomId}/round/startedAt`)
-      .once("value");
-    const startedAt = startedAtSnap.val() as number;
-    const endsAt = startedAt + roundDurationMs;
-
-    await adminDb.ref(`rooms/${roomId}/round/endsAt`).set(endsAt);
 
     return Response.json({
       ok: true,

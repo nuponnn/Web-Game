@@ -3,6 +3,7 @@ import { verifyAuth } from "@/app/lib/server/verifyAuth";
 import { adminDb } from "@/app/lib/server/firebaseAdmin";
 import { assertIsAdmin } from "@/app/lib/server/admin";
 import { LOCATIONS } from "@/app/lib/server/data/locations";
+import { cleanAndValidateLocation } from "@/app/lib/server/locations";
 import { ApiError } from "@/app/lib/server/errors";
 
 export async function POST(req: NextRequest) {
@@ -18,19 +19,25 @@ export async function POST(req: NextRequest) {
       Object.values(existing || {}).map((loc) => (loc.name || "").toLowerCase()),
     );
 
+    const updates: Record<string, unknown> = {};
     let added = 0;
     for (const loc of LOCATIONS) {
-      if (existingNames.has(loc.name.toLowerCase())) continue;
+      const clean = cleanAndValidateLocation(loc);
+      if (existingNames.has(clean.name.toLowerCase())) continue;
 
       const newRef = adminDb.ref("locations").push();
-      await newRef.set({
-        name: loc.name,
-        roles: loc.roles,
+      updates[`locations/${newRef.key}`] = {
+        name: clean.name,
+        roles: clean.roles,
         active: true,
         createdAt: ServerValue.TIMESTAMP,
         createdBy: uid,
-      });
+      };
       added++;
+    }
+
+    if (added > 0) {
+      await adminDb.ref().update(updates);
     }
 
     return Response.json({ ok: true, added });

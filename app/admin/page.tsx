@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
-import { get, ref, set, update } from "firebase/database";
+import { get, ref } from "firebase/database";
 import { auth, rldb } from "@/app/lib/firebase";
 import { useAuth } from "@/app/lib/useAuth";
 
@@ -44,18 +44,8 @@ export default function AdminLoginPage() {
 
       const adminRef = ref(rldb, `admins/${current.uid}`);
       const adminsSnap = await get(adminRef);
-      if (adminsSnap.exists()) {
-        await update(adminRef, {
-          email: current.email ?? null,
-          displayName: current.displayName ?? null,
-        });
-      } else {
-        await set(adminRef, {
-          email: current.email ?? null,
-          displayName: current.displayName ?? null,
-          addedAt: Date.now(),
-          addedBy: current.uid,
-        });
+      if (!adminsSnap.exists()) {
+        throw new Error("บัญชีนี้ยังไม่ได้รับสิทธิ์ admin");
       }
       setIsAdmin(true);
     } catch (err: unknown) {
