@@ -6,7 +6,7 @@ import {
   assertIsPlayer,
   assertAuthed,
 } from "@/app/lib/server/roomState";
-import { resolveVoteLogic } from "@/app/api/game/castVote/route";
+import { resolveVoteLogic } from "@/app/api/game/castVote/logic";
 import { ApiError } from "@/app/lib/server/errors";
 
 export async function POST(req: NextRequest) {
