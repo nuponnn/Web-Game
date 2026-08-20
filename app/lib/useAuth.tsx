@@ -1,6 +1,6 @@
 "use client";
 import { createContext, useContext, useEffect, useState } from "react";
-import { onAuthStateChanged, signInAnonymously, User, setPersistence, browserSessionPersistence } from "firebase/auth";
+import { onAuthStateChanged, signInAnonymously, User, setPersistence, indexedDBLocalPersistence } from "firebase/auth";
 import { auth } from "./firebase";
 
 type AuthContextType = {
@@ -18,9 +18,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let unsubscribe: (() => void) | undefined;
 
     async function init() {
-      if (process.env.NODE_ENV === "development") {
-        await setPersistence(auth, browserSessionPersistence);
-      }
+      await setPersistence(auth, indexedDBLocalPersistence);
 
       unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
         if (firebaseUser) {
