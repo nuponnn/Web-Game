@@ -2,6 +2,7 @@
 
 import { initializeApp, getApps, getApp } from "firebase/app";
 import {
+  browserPopupRedirectResolver,
   browserSessionPersistence,
   connectAuthEmulator,
   getAuth,
@@ -30,6 +31,7 @@ if (typeof window !== "undefined") {
   try {
     auth = initializeAuth(app, {
       persistence: browserSessionPersistence,
+      popupRedirectResolver: browserPopupRedirectResolver,
     });
   } catch {
     auth = getAuth(app);

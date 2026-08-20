@@ -107,7 +107,7 @@ export default function AdminLoginPage() {
           <div className="space-y-3">
             <p className="text-center text-sm text-text-secondary">
               {isGoogleUser
-                ? "ยังไม่พบสิทธิ์ admin กดปุ่มด้านล่างเพื่อสมัคร"
+                ? "บัญชีนี้ยังไม่ได้รับสิทธิ์ admin"
                 : "ใช้บัญชี Google เพื่อเข้าใช้งานหน้า admin"}
             </p>
             <button
