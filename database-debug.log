@@ -1,17 +1,4 @@
-20:18:45.688 [NamespaceSystem-akka.actor.default-dispatcher-5] INFO akka.event.slf4j.Slf4jLogger - Slf4jLogger started
-20:18:46.120 [main] INFO com.firebase.server.forge.App$ - Listening at 127.0.0.1:9000
-20:18:47.092 [NamespaceSystem-akka.actor.default-dispatcher-5] INFO com.firebase.core.namespace.NamespaceActor - web-game-3bab8-default-rtdb successfully activated FBKV (SurveyIdle(0)) wait: 362ms, init: 0ms
-20:18:58.149 [NamespaceSystem-blocking-namespace-operation-dispatcher-8] INFO com.firebase.core.namespace.StateManager - Namespace web-game-3bab8-default-rtdb status Active to Active
-20:24:42.235 [NamespaceSystem-blocking-namespace-operation-dispatcher-14] INFO com.firebase.core.namespace.StateManager - Namespace web-game-3bab8-default-rtdb status Active to Active
-20:46:00.323 [NamespaceSystem-blocking-namespace-operation-dispatcher-43] INFO com.firebase.core.namespace.StateManager - Namespace web-game-3bab8-default-rtdb status Active to Active
-20:50:38.928 [NamespaceSystem-blocking-namespace-operation-dispatcher-58] INFO com.firebase.core.namespace.StateManager - Namespace web-game-3bab8-default-rtdb status Active to Active
-20:54:19.990 [FirebaseWorkerPool-1-3] WARN com.firebase.core.persistence.backend.dummy.EmulatorMetadataPersistence - Multiple projectIds are not recommended in single project mode. Requested 
-namespace web-game-3bab8, but the emulator is configured for web-game-3bab8-default-rtdb. To 
-opt-out of single project mode add/set the singleProjectMode: false property in 
-the firebase.json emulators config. 
-20:54:20.000 [NamespaceSystem-akka.actor.default-dispatcher-45] INFO com.firebase.core.namespace.NamespaceActor - web-game-3bab8 successfully activated FBKV (SurveyIdle(0)) wait: 4ms, init: 0ms
-21:49:01.077 [Thread-0] INFO com.firebase.server.forge.App$ - Attempting graceful shutdown.
-21:49:01.085 [NamespaceSystem-akka.actor.default-dispatcher-158] INFO com.firebase.core.namespace.Terminator$Terminator - 2 actors left to terminate: web-game-3bab8, web-game-3bab8-default-rtdb
-21:49:01.088 [NamespaceSystem-akka.actor.default-dispatcher-157] INFO com.firebase.core.namespace.NamespaceActor - stopped namespace actor for web-game-3bab8-default-rtdb
-21:49:01.088 [NamespaceSystem-akka.actor.default-dispatcher-182] INFO com.firebase.core.namespace.NamespaceActor - stopped namespace actor for web-game-3bab8
-21:49:01.091 [Thread-0] INFO com.firebase.server.forge.App$ - Graceful shutdown complete.
+17:06:02.829 [NamespaceSystem-akka.actor.default-dispatcher-4] INFO akka.event.slf4j.Slf4jLogger - Slf4jLogger started
+17:06:03.215 [main] INFO com.firebase.server.forge.App$ - Listening at 127.0.0.1:9000
+17:06:03.887 [NamespaceSystem-akka.actor.default-dispatcher-4] INFO com.firebase.core.namespace.NamespaceActor - web-game-3bab8-default-rtdb successfully activated FBKV (SurveyIdle(0)) wait: 212ms, init: 0ms
+17:06:11.638 [NamespaceSystem-blocking-namespace-operation-dispatcher-8] INFO com.firebase.core.namespace.StateManager - Namespace web-game-3bab8-default-rtdb status Active to Active

@@ -1,0 +1,74 @@
+[debug] [2026-08-20T10:05:56.826Z] ----------------------------------------------------------------------
+[debug] [2026-08-20T10:05:56.833Z] Command:       /home/phattharaphon/.nvm/versions/node/v24.19.0/bin/node /usr/local/bin/firebase emulators:start --only auth,database --import ./firebase-export --export-on-exit ./firebase-export/
+[debug] [2026-08-20T10:05:56.834Z] CLI Version:   15.3.1
+[debug] [2026-08-20T10:05:56.835Z] Platform:      linux
+[debug] [2026-08-20T10:05:56.835Z] Node Version:  v24.19.0
+[debug] [2026-08-20T10:05:56.835Z] Time:          Thu Aug 20 2026 17:05:56 GMT+0700 (Indochina Time)
+[debug] [2026-08-20T10:05:56.836Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-08-20T10:05:56.841Z] >>> [apiv2][query] GET https://firebase-public.firebaseio.com/cli.json [none]
+[debug] [2026-08-20T10:05:59.303Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-08-20T10:05:59.303Z] > authorizing via signed-in user (nupon.pp17@gmail.com)
+[debug] [2026-08-20T10:05:59.519Z] openjdk version "21.0.11" 2026-04-21
+OpenJDK Runtime Environment (build 21.0.11+10-1-24.04.2-Ubuntu)
+OpenJDK 64-Bit Server VM (build 21.0.11+10-1-24.04.2-Ubuntu, mixed mode, sharing)
+
+[debug] [2026-08-20T10:05:59.534Z] Parsed Java major version: 21
+[info] i  emulators: Starting emulators: auth, database {"metadata":{"emulator":{"name":"hub"},"message":"Starting emulators: auth, database"}}
+[debug] [2026-08-20T10:05:59.546Z] [logging] Logging Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2026-08-20T10:05:59.546Z] [auth] Authentication Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2026-08-20T10:05:59.546Z] [database] Database Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2026-08-20T10:05:59.547Z] assigned listening specs for emulators {"user":{"hub":[{"address":"127.0.0.1","family":"IPv4","port":4400},{"address":"::1","family":"IPv6","port":4400}],"ui":[{"address":"127.0.0.1","family":"IPv4","port":4000},{"address":"::1","family":"IPv6","port":4000}],"logging":[{"address":"127.0.0.1","family":"IPv4","port":4500}],"auth":[{"address":"127.0.0.1","family":"IPv4","port":9099}],"database":[{"address":"127.0.0.1","family":"IPv4","port":9000}]},"metadata":{"message":"assigned listening specs for emulators"}}
+[debug] [2026-08-20T10:05:59.559Z] Write emulator hub locator at /tmp/hub-web-game-3bab8.json
+[debug] [2026-08-20T10:05:59.571Z] Checked if tokens are valid: false, expires at: 1787149121315
+[debug] [2026-08-20T10:05:59.571Z] Checked if tokens are valid: false, expires at: 1787149121315
+[debug] [2026-08-20T10:05:59.572Z] > refreshing access token with scopes: []
+[debug] [2026-08-20T10:05:59.574Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2026-08-20T10:05:59.574Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-08-20T10:06:00.133Z] <<< [apiv2][status] GET https://firebase-public.firebaseio.com/cli.json 200
+[debug] [2026-08-20T10:06:00.135Z] <<< [apiv2][body] GET https://firebase-public.firebaseio.com/cli.json {"cloudBuildErrorAfter":1594252800000,"cloudBuildWarnAfter":1590019200000,"defaultNode10After":1594252800000,"minVersion":"3.0.5","node8DeploysDisabledAfter":1613390400000,"node8RuntimeDisabledAfter":1615809600000,"node8WarnAfter":1600128000000}
+[debug] [2026-08-20T10:06:00.227Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2026-08-20T10:06:00.227Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-08-20T10:06:00.234Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/web-game-3bab8 [none]
+[debug] [2026-08-20T10:06:00.929Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/web-game-3bab8 200
+[debug] [2026-08-20T10:06:00.929Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/web-game-3bab8 {"projectId":"web-game-3bab8","projectNumber":"776258161898","displayName":"Web-game","name":"projects/web-game-3bab8","resources":{"hostingSite":"web-game-3bab8","realtimeDatabaseInstance":"web-game-3bab8-default-rtdb"},"state":"ACTIVE","labels":{"firebase":"enabled"},"etag":"1_fb93e7b9-5c70-49d7-9c8f-6931eeb20739"}
+[debug] [2026-08-20T10:06:00.931Z] database rules config:  [{"instance":"web-game-3bab8-default-rtdb","rules":"/home/phattharaphon/Documents/Webgame/webgame/database.rules.json"}]
+[debug] [2026-08-20T10:06:00.944Z] Ignoring unsupported arg: projectId {"metadata":{"emulator":{"name":"database"},"message":"Ignoring unsupported arg: projectId"}}
+[debug] [2026-08-20T10:06:00.944Z] Ignoring unsupported arg: auto_download {"metadata":{"emulator":{"name":"database"},"message":"Ignoring unsupported arg: auto_download"}}
+[debug] [2026-08-20T10:06:00.945Z] Ignoring unsupported arg: rules {"metadata":{"emulator":{"name":"database"},"message":"Ignoring unsupported arg: rules"}}
+[debug] [2026-08-20T10:06:00.945Z] Starting Database Emulator with command {"binary":"java","args":["-Duser.language=en","-jar","/home/phattharaphon/.cache/firebase/emulators/firebase-database-emulator-v4.11.2.jar","--host","127.0.0.1","--port",9000,"--single_project_mode","Warning"],"optionalArgs":["port","host","functions_emulator_port","functions_emulator_host","single_project_mode"],"joinArgs":false,"shell":false,"port":9000} {"metadata":{"emulator":{"name":"database"},"message":"Starting Database Emulator with command {\"binary\":\"java\",\"args\":[\"-Duser.language=en\",\"-jar\",\"/home/phattharaphon/.cache/firebase/emulators/firebase-database-emulator-v4.11.2.jar\",\"--host\",\"127.0.0.1\",\"--port\",9000,\"--single_project_mode\",\"Warning\"],\"optionalArgs\":[\"port\",\"host\",\"functions_emulator_port\",\"functions_emulator_host\",\"single_project_mode\"],\"joinArgs\":false,\"shell\":false,\"port\":9000}"}}
+[info] i  database: Database Emulator logging to database-debug.log {"metadata":{"emulator":{"name":"database"},"message":"Database Emulator logging to \u001b[1mdatabase-debug.log\u001b[22m"}}
+[debug] [2026-08-20T10:06:02.835Z] 17:06:02.829 [NamespaceSystem-akka.actor.default-dispatcher-4] INFO akka.event.slf4j.Slf4jLogger - Slf4jLogger started
+ {"metadata":{"emulator":{"name":"database"},"message":"17:06:02.829 [NamespaceSystem-akka.actor.default-dispatcher-4] INFO akka.event.slf4j.Slf4jLogger - Slf4jLogger started\n"}}
+[debug] [2026-08-20T10:06:03.215Z] 17:06:03.215 [main] INFO com.firebase.server.forge.App$ - Listening at 127.0.0.1:9000
+ {"metadata":{"emulator":{"name":"database"},"message":"17:06:03.215 [main] INFO com.firebase.server.forge.App$ - Listening at 127.0.0.1:9000\n"}}
+[info] i  database: Importing data from /home/phattharaphon/Documents/Webgame/webgame/firebase-export/database_export/web-game-3bab8-default-rtdb.json {"metadata":{"emulator":{"name":"database"},"message":"Importing data from /home/phattharaphon/Documents/Webgame/webgame/firebase-export/database_export/web-game-3bab8-default-rtdb.json"}}
+[debug] [2026-08-20T10:06:03.889Z] 17:06:03.887 [NamespaceSystem-akka.actor.default-dispatcher-4] INFO com.firebase.core.namespace.NamespaceActor - web-game-3bab8-default-rtdb successfully activated FBKV (SurveyIdle(0)) wait: 212ms, init: 0ms
+ {"metadata":{"emulator":{"name":"database"},"message":"17:06:03.887 [NamespaceSystem-akka.actor.default-dispatcher-4] INFO com.firebase.core.namespace.NamespaceActor - web-game-3bab8-default-rtdb successfully activated FBKV (SurveyIdle(0)) wait: 212ms, init: 0ms\n"}}
+[info] i  auth: Importing config from /home/phattharaphon/Documents/Webgame/webgame/firebase-export/auth_export/config.json {"metadata":{"emulator":{"name":"auth"},"message":"Importing config from /home/phattharaphon/Documents/Webgame/webgame/firebase-export/auth_export/config.json"}}
+[info] i  auth: Importing accounts from /home/phattharaphon/Documents/Webgame/webgame/firebase-export/auth_export/accounts.json {"metadata":{"emulator":{"name":"auth"},"message":"Importing accounts from /home/phattharaphon/Documents/Webgame/webgame/firebase-export/auth_export/accounts.json"}}
+[debug] [2026-08-20T10:06:11.565Z] >>> [apiv2][query] PUT http://127.0.0.1:9000/.settings/rules.json ns=web-game-3bab8-default-rtdb
+[debug] [2026-08-20T10:06:11.565Z] >>> [apiv2][body] PUT http://127.0.0.1:9000/.settings/rules.json "{\n  \"rules\": {\n    \"rooms\": {\n      \".read\": \"auth != null\",\n      \"$roomId\": {\n        \"players\": {\n          \"$uid\": {\n            \".write\": \"auth != null && auth.uid === $uid\"\n          }\n        }\n      }\n    },\n    \"roomPrivate\": {\n      \"$roomId\": {\n        \"$uid\": {\n          \".read\": \"auth != null && auth.uid === $uid\"\n        }\n      }\n    },\n    \"presence\": {\n      \"$roomId\": {\n        \"$uid\": {\n          \".write\": \"auth != null && auth.uid === $uid\"\n        }\n      }\n    },\n    \"admins\": {\n      \".read\": \"auth != null\",\n      \"$uid\": {\n        \".write\": \"auth != null && auth.uid === $uid\"\n      }\n    },\n    \"locations\": {\n      \".read\": \"auth != null\"\n    }\n  }\n}"
+[debug] [2026-08-20T10:06:11.638Z] 17:06:11.638 [NamespaceSystem-blocking-namespace-operation-dispatcher-8] INFO com.firebase.core.namespace.StateManager - Namespace web-game-3bab8-default-rtdb status Active to Active
+ {"metadata":{"emulator":{"name":"database"},"message":"17:06:11.638 [NamespaceSystem-blocking-namespace-operation-dispatcher-8] INFO com.firebase.core.namespace.StateManager - Namespace web-game-3bab8-default-rtdb status Active to Active\n"}}
+[debug] [2026-08-20T10:06:11.678Z] <<< [apiv2][status] PUT http://127.0.0.1:9000/.settings/rules.json 200
+[debug] [2026-08-20T10:06:11.678Z] <<< [apiv2][body] PUT http://127.0.0.1:9000/.settings/rules.json {"status":"ok"}
+[debug] [2026-08-20T10:06:11.686Z] Could not find VSCode notification endpoint: FetchError: request to http://localhost:40001/vscode/notify failed, reason: connect ECONNREFUSED 127.0.0.1:40001. If you are not running the Firebase Data Connect VSCode extension, this is expected and not an issue.
+[info] 
+┌─────────────────────────────────────────────────────────────┐
+│ ✔  All emulators ready! It is now safe to connect your app. │
+│ i  View Emulator UI at http://127.0.0.1:4000/               │
+└─────────────────────────────────────────────────────────────┘
+
+┌────────────────┬────────────────┬────────────────────────────────┐
+│ Emulator       │ Host:Port      │ View in Emulator UI            │
+├────────────────┼────────────────┼────────────────────────────────┤
+│ Authentication │ 127.0.0.1:9099 │ http://127.0.0.1:4000/auth     │
+├────────────────┼────────────────┼────────────────────────────────┤
+│ Database       │ 127.0.0.1:9000 │ http://127.0.0.1:4000/database │
+└────────────────┴────────────────┴────────────────────────────────┘
+  Emulator Hub host: 127.0.0.1 port: 4400
+  Other reserved ports: 4500
+
+Issues? Report them at https://github.com/firebase/firebase-tools/issues and attach the *-debug.log files.
+ 
