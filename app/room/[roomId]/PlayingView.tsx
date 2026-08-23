@@ -1,8 +1,127 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { onValue, ref } from "firebase/database";
 import { endRound } from "@/app/lib/gameFunction";
 import { Countdown } from "@/app/components/Countdown";
+import { rldb } from "@/app/lib/firebase";
 import type { Room } from "@/app/lib/useRoom";
+
+type LocationItem = { id: string; name: string };
+
+function loadCrossed(key: string | null): Record<string, boolean> {
+  if (!key || typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return {};
+
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+
+    return Object.fromEntries(
+      Object.entries(parsed).filter(
+        ([id, value]) => typeof id === "string" && value === true
+      )
+    );
+  } catch {
+    // ignore
+  }
+  return {};
+}
+
+function LocationReference({
+  roomId,
+  roundId,
+}: {
+  roomId: string;
+  roundId?: string;
+}) {
+  const [locations, setLocations] = useState<LocationItem[]>([]);
+  const crossedKey = roundId ? `spyfall-crossed:${roomId}:${roundId}` : null;
+  const [crossedOut, setCrossedOut] = useState<Record<string, boolean>>(() =>
+    loadCrossed(crossedKey)
+  );
+
+  function toggleCrossed(id: string) {
+    if (!crossedKey) return;
+
+    setCrossedOut((current) => {
+      const next = { ...current, [id]: !current[id] };
+      try {
+        window.localStorage.setItem(crossedKey, JSON.stringify(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  }
+
+  useEffect(() => {
+    if (!crossedKey || typeof window === "undefined") return;
+
+    try {
+      const roomKeyPrefix = `spyfall-crossed:${roomId}:`;
+      for (let i = window.localStorage.length - 1; i >= 0; i -= 1) {
+        const key = window.localStorage.key(i);
+        if (key?.startsWith(roomKeyPrefix) && key !== crossedKey) {
+          window.localStorage.removeItem(key);
+        }
+      }
+      window.localStorage.setItem(`spyfall-crossed-active:${roomId}`, crossedKey);
+    } catch {
+      // ignore
+    }
+  }, [crossedKey, roomId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const unsub = onValue(
+      ref(rldb, "locations"),
+      (snap) => {
+        if (cancelled) return;
+        const val = snap.val() as
+          | Record<string, { name?: string; active?: boolean }>
+          | null;
+        const list = Object.entries(val || {})
+          .filter(([, loc]) => loc.active === true && !!loc.name)
+          .map(([id, loc]) => ({ id, name: loc.name as string }));
+        list.sort((a, b) => a.name.localeCompare(b.name, "th"));
+        setLocations(list);
+      },
+      () => {}
+    );
+    return () => {
+      cancelled = true;
+      unsub();
+    };
+  }, []);
+
+  if (locations.length === 0) return null;
+
+  return (
+    <div className="space-y-2">
+      <p className="text-[10px] font-medium uppercase tracking-wide text-text-muted">
+        สถานที่ที่เป็นไปได้
+      </p>
+      <div className="flex flex-wrap gap-1.5">
+        {locations.map((loc) => (
+          <button
+            key={loc.id}
+            type="button"
+            aria-pressed={!!crossedOut[loc.id]}
+            onClick={() => toggleCrossed(loc.id)}
+            className={`min-h-8 rounded-[var(--radius-sm)] border border-border px-2.5 py-1 text-xs transition-colors ${
+              crossedOut[loc.id]
+                ? "bg-transparent text-text-muted line-through opacity-60"
+                : "bg-surface text-text-secondary hover:bg-bg-subtle"
+            }`}
+          >
+            {loc.name}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function PlayingView({
   room,
@@ -14,9 +133,9 @@ export default function PlayingView({
   uid?: string;
 }) {
   const [ending, setEnding] = useState(false);
-
   const isHost = uid === room.hostUid;
   const me = uid ? room.players[uid] : undefined;
+  const roundId = room.round?.roundId;
 
   async function handleTimeout() {
     try {
@@ -115,6 +234,9 @@ export default function PlayingView({
             </div>
           </div>
         )}
+
+        {/* Location Reference */}
+        <LocationReference key={roundId ?? "no-round"} roomId={roomId} roundId={roundId} />
 
         {/* Host End Button */}
         {isHost && (

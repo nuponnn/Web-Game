@@ -1,6 +1,6 @@
 # Spyfall System Flow
 
-เอกสารนี้อัปเดตตามโค้ดปัจจุบันของโปรเจกต์: Next.js App Router + Route Handlers, Firebase Realtime Database, Firebase Auth และ cron endpoints บน Vercel/GitHub Actions
+เอกสารนี้อัปเดตล่าสุด 2026-08-23 ตามโค้ดปัจจุบันของโปรเจกต์: Next.js App Router + Route Handlers, Firebase Realtime Database, Firebase Auth และ cron endpoints บน Vercel/GitHub Actions
 
 ## Architecture
 
@@ -89,6 +89,17 @@ Presence state:
 presence/{roomId}/{uid}: true
 ```
 
+Location catalog:
+
+```text
+locations/{locationId}
+  name: string
+  roles: string[]
+  active: boolean
+```
+
+Authenticated clients อ่าน `locations` ได้เพื่อแสดงรายการ location ใน lobby/admin และเป็น reference ระหว่างเล่น แต่การเพิ่ม/แก้ไข/เปิดปิด/ลบ location ทำผ่าน admin route handlers เท่านั้น
+
 Client ลงทะเบียน `onDisconnect()` ให้ลบ presence, set `players/{uid}/online = false` และเขียน `lastOfflineAt` อัตโนมัติเมื่อหลุดการเชื่อมต่อ
 
 ## Game Rules
@@ -126,8 +137,9 @@ Winner logic:
 
 - `POST /api/rooms/leaveRoom`
   - auth required
-  - ลบ player/presence/private ของตัวเอง
-  - ถ้า host ออกหรือไม่เหลือใคร online จะลบห้องทั้งก้อน
+  - ลบ player/presence/private/vote ของตัวเอง
+  - host ออก = ยุบห้องทันที (ลบ rooms/presence/roomPrivate ทั้งก้อน)
+  - ถ้าไม่เหลือใคร online จะลบห้องทั้งก้อน
 
 - `POST /api/rooms/closeRoom`
   - host only
@@ -215,6 +227,7 @@ Client SDK อ่าน `admins` ได้เพื่อเช็กหน้�
 - subscribe public room + private data ของตัวเองผ่าน `useRoom(roomId, uid)`
 - ใช้ `usePresence(roomId, uid, !!room)` เพื่ออัปเดต online/offline
 - render ตาม `room.status`: Lobby, Playing, Voting, Reveal
+- มีปุ่ม fixed มุมขวาบนทุก status: ผู้เล่นทั่วไปเห็น "ออกห้อง", host เห็น "ยุบห้อง"; confirm (host เห็นเตือนว่าห้องจะยุบ) -> `leaveRoom` -> กลับหน้าแรก; ถ้า host ออก backend จะลบห้องและผู้เล่นที่เหลือโดน redirect กลับหน้าแรกผ่าน kicked-detection
 - ถ้า uid ปัจจุบันไม่อยู่ใน `room.players` จะ redirect กลับหน้าแรก
 
 ### `useRoom`
@@ -236,6 +249,8 @@ Client SDK อ่าน `admins` ได้เพื่อเช็กหน้�
 
 - Countdown จาก `round.endsAt`
 - แสดง card ตาม private role: Spy, Joker, หรือผู้เล่นปกติ
+- subscribe active `locations` จาก client SDK เพื่อแสดงรายการสถานที่ที่เป็นไปได้ระหว่างเล่น
+- ผู้เล่นกดขีดฆ่า location ที่ตัดออกได้ โดยเก็บสถานะใน `localStorage` key `spyfall-crossed:{roomId}:{roundId}` และล้าง `spyfall-crossed:{roomId}:*` ของรอบเก่าเมื่อ `roundId` เปลี่ยน
 - host กดจบรอบก่อนเวลาได้
 - timeout เรียก `endRound(roomId, "timeout")`
 

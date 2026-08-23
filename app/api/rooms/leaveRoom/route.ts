@@ -16,27 +16,23 @@ export async function POST(req: NextRequest) {
     const room = await getRoomOrThrow(roomId);
     assertIsPlayer(room, uid);
 
-    const updates: Record<string, unknown> = {};
-    updates[`rooms/${roomId}/players/${uid}`] = null;
-    updates[`presence/${roomId}/${uid}`] = null;
-    updates[`roomPrivate/${roomId}/${uid}`] = null;
-
-    // ถ้าเป็น host ที่ออก ให้ลบห้องทั้งห้อง
-    if (room.hostUid === uid) {
-      updates[`rooms/${roomId}`] = null;
-      updates[`presence/${roomId}`] = null;
-      updates[`roomPrivate/${roomId}`] = null;
-    }
-
-    // ถ้าไม่เหลือใคร online เลย ให้ลบห้อง
     const otherPlayers = Object.entries(room.players).filter(
       ([pid, p]) => pid !== uid && p.online,
     );
-    if (otherPlayers.length === 0 && room.hostUid !== uid) {
-      updates[`rooms/${roomId}`] = null;
-      updates[`presence/${roomId}`] = null;
-      updates[`roomPrivate/${roomId}`] = null;
-    }
+    const shouldCloseRoom = room.hostUid === uid || otherPlayers.length === 0;
+    const updates: Record<string, unknown> = shouldCloseRoom
+      ? {
+          [`rooms/${roomId}`]: null,
+          [`presence/${roomId}`]: null,
+          [`roomPrivate/${roomId}`]: null,
+        }
+      : {
+          [`rooms/${roomId}/players/${uid}`]: null,
+          [`presence/${roomId}/${uid}`]: null,
+          [`roomPrivate/${roomId}/${uid}`]: null,
+          // ล้างโหวตค้างของตัวเอง กันนับ totalVotes เกิน totalPlayers ตอน resolve
+          [`rooms/${roomId}/votes/${uid}`]: null,
+        };
 
     await adminDb.ref().update(updates);
 
