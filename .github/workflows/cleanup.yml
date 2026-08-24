@@ -23,7 +23,7 @@ jobs:
   cleanup-auth:
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      github.event.schedule == '0 0 * * *'
+      (github.event_name == 'schedule' && github.event.schedule == '0 0 * * *')
     runs-on: ubuntu-latest
     steps:
       - name: Cleanup anonymous auth users

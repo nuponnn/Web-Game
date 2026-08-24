@@ -4,10 +4,12 @@ import { adminDb } from "@/app/lib/server/firebaseAdmin";
 import { assertAuthed } from "@/app/lib/server/roomState";
 import { assertIsAdmin } from "@/app/lib/server/admin";
 import {
+  MAX_GUESS_DURATION_MS,
   MAX_JOKER_COUNT,
   MAX_PLAYERS,
   MAX_ROUND_DURATION_MS,
   MAX_VOTE_DURATION_MS,
+  MIN_GUESS_DURATION_MS,
   MIN_ROUND_DURATION_MS,
   MIN_VOTE_DURATION_MS,
 } from "@/app/lib/server/constants";
@@ -57,6 +59,11 @@ export async function POST(req: NextRequest) {
     const requestedVoteDuration =
       typeof body?.voteDuration === "number" && Number.isFinite(body.voteDuration)
         ? Math.max(MIN_VOTE_DURATION_MS, Math.min(MAX_VOTE_DURATION_MS, body.voteDuration))
+        : undefined;
+
+    const requestedGuessDuration =
+      typeof body?.guessDuration === "number" && Number.isFinite(body.guessDuration)
+        ? Math.max(MIN_GUESS_DURATION_MS, Math.min(MAX_GUESS_DURATION_MS, body.guessDuration))
         : undefined;
 
     let selectedLocationId: string | undefined;
@@ -116,6 +123,7 @@ export async function POST(req: NextRequest) {
       ...(jokerCount !== undefined ? { jokerCount } : {}),
       ...(requestedRoundDuration !== undefined ? { roundDuration: requestedRoundDuration } : {}),
       ...(requestedVoteDuration !== undefined ? { voteDuration: requestedVoteDuration } : {}),
+      ...(requestedGuessDuration !== undefined ? { guessDuration: requestedGuessDuration } : {}),
       players: {
         [uid]: {
           name,

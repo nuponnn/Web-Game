@@ -1,11 +1,23 @@
 import { adminDb } from "@/app/lib/server/firebaseAdmin";
-import { Room } from "@/app/lib/server/roomState";
-import { ApiError } from "@/app/lib/server/errors";
+import {
+  Room,
+  RoundWinner,
+} from "@/app/lib/server/roomState";
+import {
+  DEFAULT_GUESS_DURATION_MS,
+  MAX_GUESS_DURATION_MS,
+  MIN_GUESS_DURATION_MS,
+} from "@/app/lib/server/constants";
 
-export async function resolveVoteLogic(roomId: string, room: Room) {
-  const votes = room.votes || {};
+interface PrivatePlayer {
+  isSpy?: boolean;
+  isJoker?: boolean;
+  location?: string;
+}
+
+function tallyVotes(votes: Room["votes"]): string | null {
   const tally: Record<string, number> = {};
-  Object.values(votes).forEach((vote) => {
+  Object.values(votes ?? {}).forEach((vote) => {
     if (vote.targetUid == null) return;
     tally[vote.targetUid] = (tally[vote.targetUid] || 0) + 1;
   });
@@ -22,32 +34,57 @@ export async function resolveVoteLogic(roomId: string, room: Room) {
       isTie = true;
     }
   });
-  if (isTie) votedOutUid = null;
+  if (isTie) return null;
+  return votedOutUid;
+}
 
+export async function loadPrivatePlayers(
+  roomId: string,
+): Promise<Record<string, PrivatePlayer>> {
   const privateSnap = await adminDb.ref(`roomPrivate/${roomId}`).once("value");
-  const privateVal = (privateSnap.val() as
-    | Record<string, { isSpy?: boolean; isJoker?: boolean; location?: string }>
-    | null) || {};
+  return (
+    (privateSnap.val() as Record<string, PrivatePlayer> | null) || {}
+  );
+}
 
+function getRoleLists(privateVal: Record<string, PrivatePlayer>) {
   const spyUids = Object.keys(privateVal).filter((id) => privateVal[id]?.isSpy);
-  const jokerUids = Object.keys(privateVal).filter((id) => privateVal[id]?.isJoker);
+  const jokerUids = Object.keys(privateVal).filter(
+    (id) => privateVal[id]?.isJoker
+  );
+  return { spyUids, jokerUids };
+}
 
-  if (spyUids.length === 0) {
-    throw new ApiError(
-      "internal",
-      "ไม่พบผู้เล่นที่เป็น spy ในห้องนี้ (ข้อมูลห้องผิดปกติ)",
-    );
-  }
+// คำนวณผลจริงและเขียนลง rooms/{roomId} เพื่อเปิดหน้า reveal
+export async function finalizeVote(
+  roomId: string,
+  room: Room,
+  privateVal: Record<string, PrivatePlayer>,
+) {
+  const votedOutUid = tallyVotes(room.votes);
+  const { spyUids, jokerUids } = getRoleLists(privateVal);
 
   const location =
     Object.values(privateVal).find((p) => p?.location)?.location ?? null;
 
-  let winner: "players" | "spy" | "joker";
-  if (votedOutUid !== null && jokerUids.includes(votedOutUid)) {
-    winner = "joker";
+  const guessedLocationName = room.guess?.locationName ?? null;
+  const isCorrectGuess =
+    guessedLocationName !== null && guessedLocationName === location;
+
+  let winner: RoundWinner;
+  if (spyUids.length === 0) {
+    // spy ออกจากห้องไปหมด (leave ระหว่างโหวต) - จบเกมแบบ players ชนะ
+    // แทนที่จะ throw internal error จน room ติด status voting/guessing ตลอดไป
+    winner = "players";
+  } else if (votedOutUid !== null && jokerUids.includes(votedOutUid)) {
+    // Joker โดนโหวต: spy ทายถูก = spy + joker ชนะคู่ / ทายผิด = players ชนะ
+    winner = isCorrectGuess ? "team" : "players";
+  } else if (votedOutUid !== null && spyUids.includes(votedOutUid)) {
+    // Spy โดนโหวต: spy ทายถูก = เสมอ / ทายผิด = players ชนะ
+    winner = isCorrectGuess ? "draw" : "players";
   } else {
-    const votedOutIsSpy = votedOutUid !== null && spyUids.includes(votedOutUid);
-    winner = votedOutIsSpy ? "players" : "spy";
+    // ไม่มีใครโดนโหวต หรือคนธรรมดาโดนโหวต = spy ชนะ
+    winner = "spy";
   }
 
   await adminDb.ref(`rooms/${roomId}`).update({
@@ -55,4 +92,41 @@ export async function resolveVoteLogic(roomId: string, room: Room) {
     location,
     result: { winner, spyUids, jokerUids, votedOutUid },
   });
+}
+
+export async function resolveVoteLogic(roomId: string, room: Room) {
+  const votedOutUid = tallyVotes(room.votes);
+  const privateVal = await loadPrivatePlayers(roomId);
+  const { spyUids, jokerUids } = getRoleLists(privateVal);
+
+  const caughtSpecialRole =
+    votedOutUid !== null &&
+    spyUids.length > 0 &&
+    (spyUids.includes(votedOutUid) || jokerUids.includes(votedOutUid));
+
+  if (!caughtSpecialRole) {
+    await finalizeVote(roomId, room, privateVal);
+    return;
+  }
+
+  // spy/joker โดนโหวต -> เข้าเฟสให้ spy เดาสถานที่ (ยังไม่เผย role/location)
+  const guessDurationMs = Math.max(
+    MIN_GUESS_DURATION_MS,
+    Math.min(MAX_GUESS_DURATION_MS, room.guessDuration ?? DEFAULT_GUESS_DURATION_MS),
+  );
+  const guessEndsAt = Date.now() + guessDurationMs;
+
+  // spy ที่มีสิทธิ์เดา: ถ้า spy โดนโหวต = เฉพาะคนที่โดน, ถ้า joker โดนโหวต = spy ทุกคน
+  const eligibleGuessers = spyUids.includes(votedOutUid as string)
+    ? [votedOutUid as string]
+    : spyUids;
+
+  const updates: Record<string, unknown> = {};
+  eligibleGuessers.forEach((uid) => {
+    updates[`roomPrivate/${roomId}/${uid}/canGuess`] = true;
+  });
+  updates[`rooms/${roomId}/status`] = "guessing";
+  updates[`rooms/${roomId}/round/guessEndsAt`] = guessEndsAt;
+
+  await adminDb.ref().update(updates);
 }

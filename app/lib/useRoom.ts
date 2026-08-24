@@ -12,7 +12,7 @@ import { getDatabase, ref, onValue } from "firebase/database";
 
 export type Room = {
   hostUid: string;
-  status: "lobby" | "playing" | "voting" | "reveal" | "ended";
+  status: "lobby" | "playing" | "voting" | "guessing" | "reveal" | "ended";
   createdAt?: number;
   location?: string;
   locationId?: string;
@@ -21,14 +21,22 @@ export type Room = {
   jokerCount?: number; // จำนวน joker ที่ host กำหนด (default 0, ช่วง 0-5)
   roundDuration?: number; // เวลาหา spy (ms) ที่ host กำหนด (default 8 นาที)
   voteDuration?: number; // เวลาโหวต (ms) ที่ host กำหนด (default 30 วินาที)
+  guessDuration?: number; // เวลาให้ spy เดาสถานที่ (ms) ที่ host กำหนด (default 30 วินาที)
   players: Record<
     string,
-    { name: string; online: boolean; isSpy?: boolean; isJoker?: boolean; role?: string; joinedAt: number }
+    { name: string; online: boolean; isSpy?: boolean; isJoker?: boolean; role?: string; canGuess?: boolean; joinedAt: number }
   >;
-  round?: { roundId?: string; startedAt: number; duration: number; endsAt: number; voteEndsAt?: number };
+  round?: { roundId?: string; startedAt: number; duration: number; endsAt: number; voteEndsAt?: number; guessEndsAt?: number };
   // voterUid -> { targetUid, votedAt } (targetUid = null หมายถึง skip)
   votes?: Record<string, { targetUid: string | null; votedAt: number }>;
-  result?: { winner: "players" | "spy" | "joker"; spyUids: string[]; jokerUids: string[]; votedOutUid: string | null };
+  // คำตอบของ spy ตอนเฟสเดาสถานที่ (public แต่ไม่บอกว่าถูก/ผิดจนกว่า reveal)
+  guess?: { locationName: string; guessedBy: string; guessedAt: number };
+  result?: {
+    winner: "players" | "spy" | "draw" | "team";
+    spyUids: string[];
+    jokerUids: string[];
+    votedOutUid: string | null;
+  };
 };
 
 // ข้อมูลลับของเรา (จาก roomPrivate/{roomId}/{uid}) — merge เข้า room.players[uid] + room.location
@@ -38,6 +46,7 @@ export type MyPrivateData = {
   isJoker?: boolean;
   role?: string;
   location?: string;
+  canGuess?: boolean; // true = เราได้สิทธิ์เดาสถานที่ในเฟส guessing
 };
 
 export function useRoom(roomId: string | null, uid?: string | null) {
@@ -129,6 +138,7 @@ export function useRoom(roomId: string | null, uid?: string | null) {
         isSpy: myPrivate.isSpy,
         isJoker: myPrivate.isJoker,
         role: myPrivate.role,
+        canGuess: myPrivate.canGuess,
       };
     }
 
@@ -140,8 +150,11 @@ export function useRoom(roomId: string | null, uid?: string | null) {
     };
   }, [room, myPrivate, privateMatchesRound, uid]);
 
-  const needsPrivateRole =
-    room?.status === "playing" && !!uid && !!room.players?.[uid] && !privateMatchesRound;
+  const needsPrivateState =
+    (room?.status === "playing" || room?.status === "guessing" || room?.status === "reveal") &&
+    !!uid &&
+    !!room.players?.[uid] &&
+    !privateMatchesRound;
 
-  return { room: mergedRoom, loading: !roomLoaded || !privLoaded || needsPrivateRole };
+  return { room: mergedRoom, loading: !roomLoaded || !privLoaded || needsPrivateState };
 }

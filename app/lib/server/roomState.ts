@@ -1,7 +1,15 @@
 import { adminDb } from "./firebaseAdmin";
 import { ApiError } from "./errors";
 
-export type RoomStatus = "lobby" | "playing" | "voting" | "reveal" | "ended";
+export type RoomStatus =
+  | "lobby"
+  | "playing"
+  | "voting"
+  | "guessing"
+  | "reveal"
+  | "ended";
+
+export type RoundWinner = "players" | "spy" | "draw" | "team";
 
 export interface Player {
   name: string;
@@ -22,6 +30,7 @@ export interface Room {
   jokerCount?: number;
   roundDuration?: number;
   voteDuration?: number;
+  guessDuration?: number;
   players: Record<string, Player>;
   round?: {
     roundId?: string;
@@ -29,10 +38,16 @@ export interface Room {
     duration: number;
     endsAt: number;
     voteEndsAt?: number;
+    guessEndsAt?: number;
   };
   votes?: Record<string, { targetUid: string | null; votedAt: number }>;
+  guess?: {
+    locationName: string;
+    guessedBy: string;
+    guessedAt: number;
+  };
   result?: {
-    winner: "players" | "spy" | "joker";
+    winner: RoundWinner;
     spyUids: string[];
     jokerUids: string[];
     votedOutUid: string | null;

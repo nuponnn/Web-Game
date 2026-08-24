@@ -6,17 +6,19 @@ import { playAgain } from "@/app/lib/gameFunction";
 
 type RevealStep =
   | "voted-out"
+  | "guess"
   | "location"
-  | "spy"
   | "joker"
+  | "spy"
   | "winner"
   | "done";
 
 const STEP_ORDER: RevealStep[] = [
   "voted-out",
+  "guess",
   "location",
-  "spy",
   "joker",
+  "spy",
   "winner",
   "done",
 ];
@@ -53,37 +55,32 @@ export default function RevealView({
   const isHost = uid === room?.hostUid;
 
   const isPlayerWin = result?.winner === "players";
-  const isJokerWin = result?.winner === "joker";
+  const isDraw = result?.winner === "draw";
+  const isTeamWin = result?.winner === "team";
 
   const hasJoker = jokerNames.length > 0;
+  const hasGuess = !!room.guess;
 
   // Advance through reveal steps
   useEffect(() => {
     if (!result) return;
 
-    const getDelay = (current: RevealStep): number => {
-      switch (current) {
-        case "voted-out":
-          return 2500;
-        case "location":
-          return 2500;
-        case "spy":
-          return hasJoker ? 2500 : 2000;
-        case "joker":
-          return 2500;
-        case "winner":
-          return 2000;
-        default:
-          return 0;
-      }
-    };
+    // ทุก step เปิดเผยช้าๆ 2.5 วิ ยกเว้นประกาศผล (2 วิ)
+    const getDelay = (current: RevealStep): number =>
+      current === "winner" ? 2000 : 2500;
 
     const getNextStep = (current: RevealStep): RevealStep | null => {
       const idx = STEP_ORDER.indexOf(current);
       if (idx < 0 || idx >= STEP_ORDER.length - 1) return null;
-      // Skip joker step if no jokers
-      if (current === "spy" && !hasJoker) return "winner";
-      return STEP_ORDER[idx + 1];
+      // ข้าม step ที่ไม่มีข้อมูล (ไม่มีการเดา / ไม่มี joker)
+      let next = STEP_ORDER[idx + 1];
+      while (
+        next !== "done" &&
+        ((next === "guess" && !hasGuess) || (next === "joker" && !hasJoker))
+      ) {
+        next = STEP_ORDER[STEP_ORDER.indexOf(next) + 1];
+      }
+      return next;
     };
 
     if (step === "done") return;
@@ -96,7 +93,7 @@ export default function RevealView({
 
     const timer = setTimeout(() => setStep(next), getDelay(step));
     return () => clearTimeout(timer);
-  }, [step, result, hasJoker]);
+  }, [step, result, hasJoker, hasGuess]);
 
   if (!result) {
     return (
@@ -129,7 +126,7 @@ export default function RevealView({
       {step !== "done" && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-bg/95 backdrop-blur-sm">
           <div className="w-full max-w-sm px-6">
-            {/* Voted Out Spotlight */}
+            {/* Voted Out Spotlight - แสดงแค่ชื่อ ยังไม่เฉลย role */}
             {step === "voted-out" && (
               <div className="spotlight-card text-center">
                 <p className="text-sm font-medium uppercase tracking-widest text-text-muted mb-4">
@@ -137,27 +134,64 @@ export default function RevealView({
                 </p>
                 <p className="text-3xl font-bold text-text leading-tight">
                   {votedOutName
-                    ? isJokerWin
-                      ? `${votedOutName}`
-                      : `โหวตออก: ${votedOutName}`
+                    ? `โหวตออก: ${votedOutName}`
                     : "คะแนนเสมอ"}
                 </p>
                 {votedOutName && (
                   <p className="mt-3 text-lg text-text-secondary">
-                    {isJokerWin ? "เป็น Joker!" : "ไม่ใช่ Spy"}
+                    1 คนโดนโหวตออกจากเกม
                   </p>
                 )}
               </div>
             )}
 
-            {/* Location Spotlight */}
+            {/* Spy's Guess Spotlight - ยังไม่บอกว่าถูก/ผิด */}
+            {step === "guess" && room.guess && (
+              <div className="spotlight-card text-center">
+                <div className="text-5xl mb-4">📍</div>
+                <p className="text-sm font-medium uppercase tracking-widest text-accent/60 mb-3">
+                  Spy ทายสถานที่
+                </p>
+                <p className="text-3xl font-bold text-text leading-tight">
+                  {room.guess.locationName}
+                </p>
+              </div>
+            )}
+
+            {/* Actual Location Spotlight */}
             {step === "location" && (
               <div className="spotlight-card text-center">
                 <p className="text-sm font-medium uppercase tracking-widest text-accent/60 mb-4">
-                  สถานที่คือ
+                  สถานที่จริงคือ
                 </p>
                 <p className="text-4xl font-bold text-accent">
                   {room.location}
+                </p>
+                {room.guess && (
+                  <p
+                    className={`mt-3 text-lg font-medium ${
+                      room.guess.locationName === room.location
+                        ? "text-success"
+                        : "text-danger"
+                    }`}
+                  >
+                    {room.guess.locationName === room.location
+                      ? "Spy ทายถูก!"
+                      : "Spy ทายผิด"}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Joker Spotlight */}
+            {step === "joker" && hasJoker && (
+              <div className="spotlight-card text-center">
+                <div className="text-5xl mb-4">🃏</div>
+                <p className="text-sm font-medium uppercase tracking-widest text-warning/70 mb-3">
+                  Joker คือ
+                </p>
+                <p className="text-3xl font-bold text-warning">
+                  {jokerNames.join(", ")}
                 </p>
               </div>
             )}
@@ -175,48 +209,36 @@ export default function RevealView({
               </div>
             )}
 
-            {/* Joker Spotlight */}
-            {step === "joker" && hasJoker && (
-              <div className="spotlight-card text-center">
-                <div className="text-5xl mb-4">🃏</div>
-                <p className="text-sm font-medium uppercase tracking-widest text-warning/70 mb-3">
-                  Joker คือ
-                </p>
-                <p className="text-3xl font-bold text-warning">
-                  {jokerNames.join(", ")}
-                </p>
-              </div>
-            )}
-
             {/* Winner Spotlight */}
             {step === "winner" && (
               <div className="spotlight-card text-center">
-                <div
-                  className={`text-6xl mb-4 ${
-                    isPlayerWin
-                      ? ""
-                      : isJokerWin
-                        ? ""
-                        : ""
-                  }`}
-                >
-                  {isPlayerWin ? "🎉" : isJokerWin ? "🃏" : "🕵️"}
+                <div className="text-6xl mb-4">
+                  {isPlayerWin ? "🎉" : isDraw ? "🤝" : isTeamWin ? "🎭" : "🕵️"}
                 </div>
                 <h1
                   className={`text-4xl font-bold ${
                     isPlayerWin
                       ? "text-success"
-                      : isJokerWin
-                        ? "text-warning"
-                        : "text-danger"
+                      : isDraw
+                        ? "text-text"
+                        : isTeamWin
+                          ? "text-warning"
+                          : "text-danger"
                   }`}
                 >
                   {isPlayerWin
                     ? "ผู้เล่นชนะ!"
-                    : isJokerWin
-                      ? "Joker ชนะ!"
-                      : "Spy ชนะ!"}
+                    : isDraw
+                      ? "เสมอ!"
+                      : isTeamWin
+                        ? "Spy & Joker ชนะ!"
+                        : "Spy ชนะ!"}
                 </h1>
+                {isTeamWin && (
+                  <p className="mt-2 text-sm text-text-secondary">
+                    {[...spyNames, ...jokerNames].join(", ")}
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -225,7 +247,7 @@ export default function RevealView({
 
       {/* List view - reveals accumulate as spotlight moves on */}
       <div className="w-full max-w-sm space-y-3">
-        {/* Voted Out */}
+        {/* Voted Out - ไม่เฉลย role */}
         {isRevealed("voted-out") && (
           <div className="reveal-settled rounded-[var(--radius-md)] border border-border bg-surface px-4 py-3">
             <p className="text-[10px] font-medium uppercase tracking-wide text-text-muted">
@@ -233,40 +255,49 @@ export default function RevealView({
             </p>
             <p className="mt-0.5 text-sm font-medium text-text">
               {votedOutName
-                ? isJokerWin
-                  ? `${votedOutName} เป็น Joker`
-                  : `คนที่โดนโหวตออก: ${votedOutName}`
+                ? `คนที่โดนโหวตออก: ${votedOutName}`
                 : "คะแนนเสมอ ไม่มีใครถูกจับ"}
             </p>
           </div>
         )}
 
-        {/* Location */}
+        {/* Spy's Guess */}
+        {isRevealed("guess") && room.guess && (
+          <div className="reveal-settled rounded-[var(--radius-md)] border border-border bg-surface px-4 py-3">
+            <div className="flex items-center gap-2">
+              <span className="text-base">📍</span>
+              <div>
+                <p className="text-[10px] font-medium uppercase tracking-wide text-text-muted">
+                  คำตอบของ Spy
+                </p>
+                <p className="mt-0.5 text-sm font-bold text-text">
+                  {room.guess.locationName}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Actual Location */}
         {isRevealed("location") && (
           <div className="reveal-settled rounded-[var(--radius-md)] border border-accent/30 bg-accent-light px-4 py-3">
             <p className="text-[10px] font-medium uppercase tracking-wide text-accent/60">
-              สถานที่
+              สถานที่จริง
             </p>
             <p className="mt-0.5 text-base font-bold text-accent">
               {room.location}
             </p>
-          </div>
-        )}
-
-        {/* Spy */}
-        {isRevealed("spy") && (
-          <div className="reveal-settled rounded-[var(--radius-md)] border border-danger/30 bg-danger/5 px-4 py-3">
-            <div className="flex items-center gap-2">
-              <span className="text-base">🕵️</span>
-              <div>
-                <p className="text-[10px] font-medium uppercase tracking-wide text-danger/60">
-                  Spy
-                </p>
-                <p className="text-sm font-bold text-danger">
-                  {spyNames.join(", ")}
-                </p>
-              </div>
-            </div>
+            {room.guess && (
+              <p
+                className={`mt-1 text-xs font-medium ${
+                  room.guess.locationName === room.location
+                    ? "text-success"
+                    : "text-danger"
+                }`}
+              >
+                Spy {room.guess.locationName === room.location ? "ทายถูก" : "ทายผิด"}
+              </p>
+            )}
           </div>
         )}
 
@@ -287,6 +318,23 @@ export default function RevealView({
           </div>
         )}
 
+        {/* Spy */}
+        {isRevealed("spy") && (
+          <div className="reveal-settled rounded-[var(--radius-md)] border border-danger/30 bg-danger/5 px-4 py-3">
+            <div className="flex items-center gap-2">
+              <span className="text-base">🕵️</span>
+              <div>
+                <p className="text-[10px] font-medium uppercase tracking-wide text-danger/60">
+                  Spy
+                </p>
+                <p className="text-sm font-bold text-danger">
+                  {spyNames.join(", ")}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Winner badge */}
         {isRevealed("winner") && (
           <div className="reveal-settled text-center pt-2">
@@ -294,30 +342,41 @@ export default function RevealView({
               className={`mx-auto inline-flex h-16 w-16 items-center justify-center rounded-full ${
                 isPlayerWin
                   ? "bg-success-light"
-                  : isJokerWin
-                    ? "bg-warning-light"
-                    : "bg-danger/10"
+                  : isDraw
+                    ? "bg-bg-subtle"
+                    : isTeamWin
+                      ? "bg-warning-light"
+                      : "bg-danger/10"
               }`}
             >
               <span className="text-2xl">
-                {isPlayerWin ? "🎉" : isJokerWin ? "🃏" : "🕵️"}
+                {isPlayerWin ? "🎉" : isDraw ? "🤝" : isTeamWin ? "🎭" : "🕵️"}
               </span>
             </div>
             <h1
               className={`mt-2 text-xl font-bold ${
                 isPlayerWin
                   ? "text-success"
-                  : isJokerWin
-                    ? "text-warning"
-                    : "text-danger"
+                  : isDraw
+                    ? "text-text"
+                    : isTeamWin
+                      ? "text-warning"
+                      : "text-danger"
               }`}
             >
               {isPlayerWin
                 ? "ผู้เล่นชนะ!"
-                : isJokerWin
-                  ? "Joker ชนะ!"
-                  : "Spy ชนะ!"}
+                : isDraw
+                  ? "เสมอ!"
+                  : isTeamWin
+                    ? "Spy & Joker ชนะ!"
+                    : "Spy ชนะ!"}
             </h1>
+            {isTeamWin && (
+              <p className="mt-1 text-xs text-text-secondary">
+                {[...spyNames, ...jokerNames].join(", ")}
+              </p>
+            )}
           </div>
         )}
 

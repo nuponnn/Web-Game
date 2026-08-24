@@ -9,11 +9,14 @@ import {
 } from "@/app/lib/server/roomState";
 import { assignRoles, randomInt, shuffled } from "@/app/lib/server/locations";
 import {
+  DEFAULT_GUESS_DURATION_MS,
   DEFAULT_ROUND_DURATION_MS,
   DEFAULT_VOTE_DURATION_MS,
+  MAX_GUESS_DURATION_MS,
   MAX_JOKER_COUNT,
   MAX_ROUND_DURATION_MS,
   MAX_VOTE_DURATION_MS,
+  MIN_GUESS_DURATION_MS,
   MIN_PLAYERS,
   MIN_ROUND_DURATION_MS,
   MIN_VOTE_DURATION_MS,
@@ -123,6 +126,15 @@ export async function POST(req: NextRequest) {
       Math.min(MAX_VOTE_DURATION_MS, requestedVoteDuration),
     );
 
+    const requestedGuessDuration =
+      typeof body?.guessDuration === "number" && Number.isFinite(body.guessDuration)
+        ? body.guessDuration
+        : room.guessDuration ?? DEFAULT_GUESS_DURATION_MS;
+    const guessDurationMs = Math.max(
+      MIN_GUESS_DURATION_MS,
+      Math.min(MAX_GUESS_DURATION_MS, requestedGuessDuration),
+    );
+
     const shuffledPlayerIds = shuffled(playerIds);
     const spyUids = shuffledPlayerIds.slice(0, requestedSpyCount);
     const spySet = new Set(spyUids);
@@ -169,14 +181,19 @@ export async function POST(req: NextRequest) {
     updates[`rooms/${roomId}/selectedLocationId`] = requestedLocationId ?? null;
     updates[`rooms/${roomId}/status`] = "playing";
     updates[`rooms/${roomId}/votes`] = null;
+    updates[`rooms/${roomId}/guess`] = null;
     updates[`rooms/${roomId}/result`] = null;
     updates[`rooms/${roomId}/round/roundId`] = roundId;
     updates[`rooms/${roomId}/round/duration`] = roundDurationMs;
     updates[`rooms/${roomId}/round/startedAt`] = startedAt;
     updates[`rooms/${roomId}/round/endsAt`] = endsAt;
+    // ล้าง timer ตกค้างจากรอบก่อน กันหน้า UI อ่านค่าเก่า
+    updates[`rooms/${roomId}/round/voteEndsAt`] = null;
+    updates[`rooms/${roomId}/round/guessEndsAt`] = null;
     updates[`rooms/${roomId}/spyCount`] = requestedSpyCount;
     updates[`rooms/${roomId}/roundDuration`] = roundDurationMs;
     updates[`rooms/${roomId}/voteDuration`] = voteDurationMs;
+    updates[`rooms/${roomId}/guessDuration`] = guessDurationMs;
     updates[`rooms/${roomId}/jokerCount`] = requestedJokerCount;
 
     await adminDb.ref().update({ ...updates, ...privateUpdates });
@@ -188,6 +205,7 @@ export async function POST(req: NextRequest) {
       jokerCount: requestedJokerCount,
       roundDuration: roundDurationMs,
       voteDuration: voteDurationMs,
+      guessDuration: guessDurationMs,
     });
   } catch (e) {
     if (e instanceof ApiError) return e.toResponse();

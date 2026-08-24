@@ -1,8 +1,8 @@
 {
   "rules": {
     "rooms": {
-      ".read": "auth != null",
       "$roomId": {
+        ".read": "auth != null",
         "players": {
           "$uid": {
             ".write": "auth != null && auth.uid === $uid",
@@ -41,8 +41,8 @@
       }
     },
     "admins": {
-      ".read": "auth != null",
       "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
         ".write": false
       }
     },

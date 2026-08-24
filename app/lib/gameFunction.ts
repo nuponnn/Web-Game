@@ -19,7 +19,7 @@ async function apiCall<T>(path: string, body: Record<string, unknown>): Promise<
 
 export async function createRoom(
   name: string,
-  options?: { locationId?: string; spyCount?: number; jokerCount?: number; roundDuration?: number; voteDuration?: number }
+  options?: { locationId?: string; spyCount?: number; jokerCount?: number; roundDuration?: number; voteDuration?: number; guessDuration?: number }
 ) {
   return apiCall<{ roomId: string }>("/api/rooms/createRoom", {
     name,
@@ -28,6 +28,7 @@ export async function createRoom(
     ...(options?.jokerCount !== undefined ? { jokerCount: options.jokerCount } : {}),
     ...(options?.roundDuration ? { roundDuration: options.roundDuration } : {}),
     ...(options?.voteDuration ? { voteDuration: options.voteDuration } : {}),
+    ...(options?.guessDuration ? { guessDuration: options.guessDuration } : {}),
   });
 }
 
@@ -37,9 +38,9 @@ export async function joinRoom(roomId: string, name: string) {
 
 export async function startGame(
   roomId: string,
-  options?: { locationId?: string; spyCount?: number; jokerCount?: number; roundDuration?: number; voteDuration?: number }
+  options?: { locationId?: string; spyCount?: number; jokerCount?: number; roundDuration?: number; voteDuration?: number; guessDuration?: number }
 ) {
-  return apiCall<{ ok: true; endsAt: number; spyCount: number; jokerCount: number; roundDuration: number; voteDuration: number }>(
+  return apiCall<{ ok: true; endsAt: number; spyCount: number; jokerCount: number; roundDuration: number; voteDuration: number; guessDuration: number }>(
     "/api/game/startGame",
     {
       roomId,
@@ -48,6 +49,7 @@ export async function startGame(
       ...(options?.jokerCount !== undefined ? { jokerCount: options.jokerCount } : {}),
       ...(options?.roundDuration ? { roundDuration: options.roundDuration } : {}),
       ...(options?.voteDuration ? { voteDuration: options.voteDuration } : {}),
+      ...(options?.guessDuration ? { guessDuration: options.guessDuration } : {}),
     },
   );
 }
@@ -65,6 +67,14 @@ export async function castVote(roomId: string, targetUid?: string | null) {
 
 export async function resolveVote(roomId: string) {
   return apiCall<{ ok: true }>("/api/game/resolveVote", { roomId });
+}
+
+export async function submitGuess(roomId: string, locationName: string) {
+  return apiCall<{ ok: true }>("/api/game/submitGuess", { roomId, locationName });
+}
+
+export async function resolveGuess(roomId: string) {
+  return apiCall<{ ok: true }>("/api/game/resolveGuess", { roomId });
 }
 
 export async function playAgain(roomId: string) {

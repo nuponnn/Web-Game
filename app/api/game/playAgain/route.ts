@@ -28,6 +28,7 @@ export async function POST(req: NextRequest) {
       [`rooms/${roomId}/status`]: "lobby",
       [`rooms/${roomId}/round`]: null,
       [`rooms/${roomId}/votes`]: null,
+      [`rooms/${roomId}/guess`]: null,
       [`rooms/${roomId}/result`]: null,
       [`roomPrivate/${roomId}`]: null,
     });

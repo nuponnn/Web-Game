@@ -1,15 +1,15 @@
 "use client";
 
-import { initializeApp, getApps, getApp } from "firebase/app";
+import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
 import {
   browserPopupRedirectResolver,
   browserSessionPersistence,
   connectAuthEmulator,
   getAuth,
   initializeAuth,
+  type Auth,
 } from "firebase/auth";
-import { getDatabase, connectDatabaseEmulator } from "firebase/database";
-import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
+import { getDatabase, connectDatabaseEmulator, type Database } from "firebase/database";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -23,9 +23,9 @@ const firebaseConfig = {
 };
 
 // Singleton pattern ป้องกันการรัน initializeApp ซ้ำ
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-/** @type {import("firebase/auth").Auth} */
-let auth;
+const app: FirebaseApp = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+
+let auth: Auth;
 
 if (typeof window !== "undefined") {
   try {
@@ -40,9 +40,7 @@ if (typeof window !== "undefined") {
   auth = getAuth(app);
 }
 
-const rldb = getDatabase(app);
-
-const functions = getFunctions(getApp());
+const rldb: Database = getDatabase(app);
 
 if (typeof window !== "undefined") {
   const isLocalhost =
@@ -51,14 +49,11 @@ if (typeof window !== "undefined") {
 
   if (isLocalhost) {
     // 🖥️ ถ้าทำงานบนเครื่องเรา -> ต่อเข้า Emulator
-
     connectAuthEmulator(auth, "http://127.0.0.1:9099");
     connectDatabaseEmulator(rldb, "127.0.0.1", 9000);
-    connectFunctionsEmulator(functions, "127.0.0.1", 5001);
     console.log("⚡ Connected to Firebase Emulator Suite");
   } else {
-    // ✅ Analytics เปิดแค่ตอน production จริงๆ
-    // เปิดใช้งาน Analytics เฉพาะบน Browser
+    // ✅ Analytics เปิดแค่ production จริง บน browser เท่านั้น
     import("firebase/analytics").then(({ getAnalytics, isSupported }) => {
       isSupported().then((supported) => {
         if (supported) getAnalytics(app);
@@ -67,4 +62,4 @@ if (typeof window !== "undefined") {
   }
 }
 
-export { app, auth, rldb,functions };
+export { app, auth, rldb };

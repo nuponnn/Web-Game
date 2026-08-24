@@ -10,7 +10,9 @@ interface CountdownProps {
 export function Countdown({ endsAt, onExpire }: CountdownProps) {
   const offset = useServerTimeOffset();
   const [remainingMs, setRemainingMs] = useState(() => endsAt - Date.now());
-  const [hasExpired, setHasExpired] = useState(false);
+  // Bind expiry to the current deadline so a reused Countdown resets on the next round.
+  const [expiredEndsAt, setExpiredEndsAt] = useState<number | null>(null);
+  const hasExpired = expiredEndsAt === endsAt;
 
   const onExpireRef = useRef(onExpire);
   useEffect(() => {
@@ -26,7 +28,7 @@ export function Countdown({ endsAt, onExpire }: CountdownProps) {
       setRemainingMs(remaining);
 
       if (remaining <= 0) {
-        setHasExpired(true);
+        setExpiredEndsAt(endsAt);
       }
     };
 
@@ -37,7 +39,7 @@ export function Countdown({ endsAt, onExpire }: CountdownProps) {
 
   useEffect(() => {
     if (hasExpired) onExpireRef.current?.();
-  }, [hasExpired]);
+  }, [endsAt, hasExpired]);
 
   const totalSeconds = Math.ceil(remainingMs / 1000);
   const minutes = Math.floor(totalSeconds / 60);

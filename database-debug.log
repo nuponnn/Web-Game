@@ -1,4 +1,0 @@
-17:06:02.829 [NamespaceSystem-akka.actor.default-dispatcher-4] INFO akka.event.slf4j.Slf4jLogger - Slf4jLogger started
-17:06:03.215 [main] INFO com.firebase.server.forge.App$ - Listening at 127.0.0.1:9000
-17:06:03.887 [NamespaceSystem-akka.actor.default-dispatcher-4] INFO com.firebase.core.namespace.NamespaceActor - web-game-3bab8-default-rtdb successfully activated FBKV (SurveyIdle(0)) wait: 212ms, init: 0ms
-17:06:11.638 [NamespaceSystem-blocking-namespace-operation-dispatcher-8] INFO com.firebase.core.namespace.StateManager - Namespace web-game-3bab8-default-rtdb status Active to Active

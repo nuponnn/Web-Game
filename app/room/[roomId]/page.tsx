@@ -8,6 +8,7 @@ import { leaveRoom } from "@/app/lib/gameFunction";
 import LobbyView from "./LobbyView";
 import PlayingView from "./PlayingView";
 import VotingView from "./VotingView";
+import GuessView from "./GuessView";
 import RevealView from "./RevealView";
 
 export default function RoomPage() {
@@ -85,6 +86,8 @@ export default function RoomPage() {
         return <PlayingView room={room} roomId={roomId} uid={user?.uid} />;
       case "voting":
         return <VotingView room={room} roomId={roomId} uid={user?.uid} />;
+      case "guessing":
+        return <GuessView room={room} roomId={roomId} uid={user?.uid} />;
       case "reveal":
         return <RevealView room={room} roomId={roomId} uid={user?.uid} />;
       default:

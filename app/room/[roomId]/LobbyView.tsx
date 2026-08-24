@@ -37,6 +37,9 @@ export default function LobbyView({
   const [voteDurationSec, setVoteDurationSec] = useState(
     Math.round((room.voteDuration ?? 30 * 1000) / 1000)
   );
+  const [guessDurationSec, setGuessDurationSec] = useState(
+    Math.round((room.guessDuration ?? 30 * 1000) / 1000)
+  );
   const [isAdminHost, setIsAdminHost] = useState(false);
   const [kicking, setKicking] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
@@ -121,6 +124,7 @@ export default function LobbyView({
         jokerCount,
         roundDuration: roundDurationMin * 60 * 1000,
         voteDuration: voteDurationSec * 1000,
+        guessDuration: guessDurationSec * 1000,
       });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "เริ่มเกมไม่สำเร็จ");
@@ -334,6 +338,22 @@ export default function LobbyView({
                     <select
                       value={voteDurationSec}
                       onChange={(e) => setVoteDurationSec(Number(e.target.value))}
+                      className="w-full rounded-[var(--radius-sm)] border border-border bg-surface px-3 py-2 text-sm text-text focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/20"
+                    >
+                      {[10, 15, 20, 30, 45, 60, 90, 120].map((s) => (
+                        <option key={s} value={s}>
+                          {s >= 60 ? `${s / 60}m` : `${s}s`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-xs text-text-secondary">
+                      Guess time
+                    </label>
+                    <select
+                      value={guessDurationSec}
+                      onChange={(e) => setGuessDurationSec(Number(e.target.value))}
                       className="w-full rounded-[var(--radius-sm)] border border-border bg-surface px-3 py-2 text-sm text-text focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/20"
                     >
                       {[10, 15, 20, 30, 45, 60, 90, 120].map((s) => (

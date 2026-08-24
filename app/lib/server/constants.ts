@@ -21,3 +21,8 @@ export const MAX_ROUND_DURATION_MS = 15 * 60 * 1000;
 export const DEFAULT_VOTE_DURATION_MS = 30 * 1000;
 export const MIN_VOTE_DURATION_MS = 10 * 1000;
 export const MAX_VOTE_DURATION_MS = 120 * 1000;
+
+// เวลาให้ spy เดาสถานที่หลังจบการโหวต (spy/joker โดนโหวต)
+export const DEFAULT_GUESS_DURATION_MS = 30 * 1000;
+export const MIN_GUESS_DURATION_MS = 10 * 1000;
+export const MAX_GUESS_DURATION_MS = 120 * 1000;
