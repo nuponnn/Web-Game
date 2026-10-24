@@ -43,4 +43,5 @@ ui-debug.log*
 *.tsbuildinfo
 next-env.d.ts
 
-firebase-export
+firebase-export*
+

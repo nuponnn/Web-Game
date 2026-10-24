@@ -17,8 +17,10 @@ export default function RoomPage() {
   const { user } = useAuth();
   const { room, loading } = useRoom(roomId, user?.uid);
   const [leaving, setLeaving] = useState(false);
-
-  usePresence(roomId, user?.uid, !!room);
+  const [leaveError, setLeaveError] = useState("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const enabled = !!(user && room?.players?.[user.uid]);
+  usePresence(roomId, user?.uid, enabled);
 
   const kicked = !!user?.uid && !!room && !room.players[user.uid];
   const isHost = !!user?.uid && room?.hostUid === user.uid;
@@ -27,20 +29,21 @@ export default function RoomPage() {
     if (kicked) router.push("/");
   }, [kicked, router]);
 
-  async function handleLeave() {
-    if (leaving) return;
-    const message = isHost
-      ? "ยุบห้องนี้ทันที? ผู้เล่นทุกคนจะออกจากห้องและข้อมูลรอบนี้จะถูกลบ"
-      : "ออกจากห้องนี้?";
-    if (!window.confirm(message)) return;
-    setLeaving(true);
-    try {
-      await leaveRoom(roomId);
-    } catch {
-      // ignore - ยังกลับหน้าแรกแม้ API fail
-    }
+ async function doLeave() {
+  if (leaving) return;
+  setConfirmOpen(false);
+  setLeaving(true);
+  setLeaveError("");
+  try {
+    await leaveRoom(roomId);
     router.push("/");
+  } catch (err) {
+    setLeaveError(
+      err instanceof Error ? err.message : "ออกจากห้องไม่สำเร็จ กรุณาลองอีกครั้ง",
+    );
+    setLeaving(false);
   }
+}
 
   if (loading) {
     return (
@@ -101,15 +104,42 @@ export default function RoomPage() {
 
   return (
     <>
+    {confirmOpen && (
+  <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4">
+    <div className="w-full max-w-sm space-y-4 rounded-[var(--radius-md)] bg-surface p-4">
+      <p className="text-sm">
+        {isHost
+          ? "ยุบห้องนี้ทันที? ผู้เล่นทุกคนจะออกจากห้องและข้อมูลรอบนี้จะถูกลบ"
+          : "ออกจากห้องนี้?"}
+      </p>
+      <div className="flex justify-end gap-2">
+        <button onClick={() => setConfirmOpen(false)} className="px-3 py-1.5 text-sm">
+          ยกเลิก
+        </button>
+        <button onClick={doLeave} className="px-3 py-1.5 text-sm text-danger">
+          ยืนยัน
+        </button>
+      </div>
+    </div>
+  </div>
+)}
       <button
         type="button"
-        onClick={handleLeave}
+       onClick={() => setConfirmOpen(true)}
         disabled={leaving}
         aria-label={isHost ? "ยุบห้อง" : "ออกจากห้อง"}
         className="fixed right-4 top-4 z-50 min-h-9 rounded-[var(--radius-md)] border border-border bg-surface/95 px-3 py-1.5 text-xs font-medium text-text-secondary shadow-sm transition-colors hover:bg-bg-subtle hover:text-danger disabled:cursor-not-allowed disabled:opacity-50"
       >
         {leaving ? "..." : isHost ? "ยุบห้อง" : "ออกห้อง"}
       </button>
+      {leaveError && (
+        <p
+          role="alert"
+          className="fixed right-4 top-16 z-50 max-w-xs rounded-[var(--radius-md)] bg-danger/10 px-3 py-2 text-xs text-danger"
+        >
+          {leaveError}
+        </p>
+      )}
       {content}
     </>
   );

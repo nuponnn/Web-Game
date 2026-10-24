@@ -76,7 +76,7 @@ export default function Home() {
             className="w-full rounded-[var(--radius-md)] border border-border bg-surface px-4 py-3 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
           />
         </div>
-
+ 
         {/* Action Buttons */}
         {mode === "idle" && (
           <div className="space-y-3">

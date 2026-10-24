@@ -15,6 +15,7 @@ import {
 } from "@/app/lib/server/constants";
 import { ApiError } from "@/app/lib/server/errors";
 
+//create id room
 const ROOM_ID_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
 function generateRoomId(length = 4): string {
@@ -41,6 +42,7 @@ export async function POST(req: NextRequest) {
       typeof body?.locationId === "string" && body.locationId.length > 0
         ? body.locationId
         : undefined;
+
     const requestedSpyCount =
       typeof body?.spyCount === "number" && Number.isInteger(body.spyCount)
         ? body.spyCount
@@ -70,9 +72,9 @@ export async function POST(req: NextRequest) {
     let spyCount: number | undefined;
     let jokerCount: number | undefined;
 
-    if (requestedLocationId || requestedSpyCount !== undefined) {
-      await assertIsAdmin(uid);
-    }
+    // if (requestedLocationId || requestedSpyCount !== undefined) {
+    //   await assertIsAdmin(uid);
+    // }
 
     const db = adminDb;
 
