@@ -6,6 +6,7 @@ import { GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
 import { get, ref } from "firebase/database";
 import { auth, rldb } from "@/app/lib/firebase";
 import { useAuth } from "@/app/lib/useAuth";
+import { notFound } from "next/navigation";
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -15,7 +16,8 @@ export default function AdminLoginPage() {
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
 
   const isGoogleUser = !!user && !user.isAnonymous;
-
+  if (process.env.NODE_ENV === "production") notFound();
+  
   useEffect(() => {
     let cancelled = false;
     if (!loading && isGoogleUser && user) {
