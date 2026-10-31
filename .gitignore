@@ -44,4 +44,8 @@ ui-debug.log*
 next-env.d.ts
 
 firebase-export*
-
+.impeccable
+.codex
+.agents
+AGENTS.md
+CLAUDE.md
