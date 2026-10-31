@@ -49,3 +49,4 @@ firebase-export*
 .agents
 AGENTS.md
 CLAUDE.md
+.opencode/
