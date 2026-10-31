@@ -162,14 +162,14 @@ export default function Home() {
         )}
 
         {/* Admin Link */}
-        <div className="text-center">
+        {/* <div className="text-center">
           <Link
             href="/admin"
             className="text-xs text-text-muted transition-colors hover:text-text-secondary"
           >
             Admin
           </Link>
-        </div>
+        </div> */}
       </div>
     </main>
   );
