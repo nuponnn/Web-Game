@@ -50,3 +50,5 @@ firebase-export*
 AGENTS.md
 CLAUDE.md
 .opencode/
+*-debug.log
+*.log
